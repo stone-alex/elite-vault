@@ -5,34 +5,32 @@ import com.google.gson.annotations.SerializedName;
 import java.util.List;
 
 public class CommodityItemDto {
-
     @SerializedName("name")
     private String name;
 
-    @SerializedName("MeanPrice")
+    @SerializedName("meanPrice")          // ← fixed: lowercase 'm'
     private Integer meanPrice;
 
-    @SerializedName("BuyPrice")
+    @SerializedName("buyPrice")
     private Integer buyPrice;
 
-    @SerializedName("SellPrice")
+    @SerializedName("sellPrice")
     private Integer sellPrice;
 
-    @SerializedName("Stock")
+    @SerializedName("stock")
     private Integer stock;
 
-    @SerializedName("StockBracket")
-    private String stockBracket;      // "0","1","2","3",""  — use String for flexibility
+    @SerializedName("stockBracket")
+    private String stockBracket;          // "" or "0".."3"
 
-    @SerializedName("Demand")
+    @SerializedName("demand")
     private Integer demand;
 
-    @SerializedName("DemandBracket")
+    @SerializedName("demandBracket")
     private String demandBracket;
 
     @SerializedName("statusFlags")
-    private List<String> statusFlags;  // e.g. ["Rare", "HighDemand", "Consumer", ...]
-
+    private List<String> statusFlags;
     // getters + setters
 
     public String getName() {

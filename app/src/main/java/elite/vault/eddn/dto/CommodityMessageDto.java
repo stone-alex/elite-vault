@@ -4,42 +4,39 @@ import com.google.gson.annotations.SerializedName;
 
 import java.util.List;
 
-public class CommodityMessageDto extends BaseDto {  // timestamp & horizons/odyssey from BaseDto
+public class CommodityMessageDto extends BaseDto {
 
-    // No "event" field in commodity schema → can ignore or add custom if storing mixed
+    @SerializedName("systemName")
+    private String systemName;
 
-    @SerializedName("StarSystem")
-    private String starSystem;
-
-    @SerializedName("StationName")
+    @SerializedName("stationName")
     private String stationName;
 
-    @SerializedName("MarketID")
+    @SerializedName("marketId")
     private Long marketId;
 
-    @SerializedName("StationType")
-    private String stationType;           // optional in some cases
+    @SerializedName("stationType")
+    private String stationType;
 
     @SerializedName("CarrierDockingAccess")
-    private String carrierDockingAccess;  // optional, e.g. for fleet carriers
+    private String carrierDockingAccess;
 
-    @SerializedName("Economies")
+    @SerializedName("economies")
     private List<EconomyDto> economies;
 
-    @SerializedName("Prohibited")
+    @SerializedName("prohibited")
     private List<String> prohibited;
 
-    @SerializedName("Commodities")
+    @SerializedName("commodities")
     private List<CommodityItemDto> commodities;
 
-    // getters + setters
-
-    public String getStarSystem() {
-        return starSystem;
+    // getters + setters – update names to match Java convention
+    public String getSystemName() {
+        return systemName;
     }
 
-    public void setStarSystem(String starSystem) {
-        this.starSystem = starSystem;
+    public void setSystemName(String systemName) {
+        this.systemName = systemName;
     }
 
     public String getStationName() {
@@ -66,14 +63,6 @@ public class CommodityMessageDto extends BaseDto {  // timestamp & horizons/odys
         this.stationType = stationType;
     }
 
-    public String getCarrierDockingAccess() {
-        return carrierDockingAccess;
-    }
-
-    public void setCarrierDockingAccess(String carrierDockingAccess) {
-        this.carrierDockingAccess = carrierDockingAccess;
-    }
-
     public List<EconomyDto> getEconomies() {
         return economies;
     }
@@ -96,5 +85,21 @@ public class CommodityMessageDto extends BaseDto {  // timestamp & horizons/odys
 
     public void setCommodities(List<CommodityItemDto> commodities) {
         this.commodities = commodities;
+    }
+
+    public String getCarrierDockingAccess() {
+        return carrierDockingAccess;
+    }
+
+    // Optional: add toString() for easier debugging
+    @Override
+    public String toString() {
+        return "CommodityMessageDto{" +
+                "systemName='" + systemName + '\'' +
+                ", stationName='" + stationName + '\'' +
+                ", marketId=" + marketId +
+                ", stationType='" + stationType + '\'' +
+                ", commoditiesCount=" + (commodities != null ? commodities.size() : 0) +
+                '}';
     }
 }
