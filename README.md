@@ -14,7 +14,8 @@ it emphasizes **data freshness** over historical archives: market prices and pow
 ## Why Elite Vault?
 
 Third-party sites are great until the maintainer retires, the server goes offline, or the "unofficial API" breaks.
-Elite Vault gives you full control: your data, your uptime, your queries accessible from Elite Intel or any custom tool that implements the REST API.
+Elite Vault gives you full control: your data, your uptime, your queries are accessible from [Elite Intel](https://github.com/stone-alex/EliteIntel)
+or any custom tool that implements the REST API.
 
 ### Key Features
 
