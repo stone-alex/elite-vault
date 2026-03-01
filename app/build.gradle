@@ -44,10 +44,31 @@ dependencies {
     implementation 'org.zeromq:jeromq:0.6.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
 
-    // ... existing deps ...
+    // YAML
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.0'     // or latest 2.18.x / 2.19.x / 2.21.x
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.0'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.0'
+
+
+    /// Embedded light weight web service
+    // Core Javalin (already have this)
+    implementation 'io.javalin:javalin:7.0.1'
+
+    // OpenAPI support – match version to Javalin major (7.0.x here)
+    def openapiVersion = '7.0.1'
+
+    // Runtime plugin to serve /openapi.json
+    implementation "io.javalin.community.openapi:javalin-openapi-plugin:${openapiVersion}"
+
+    // Optional: Swagger UI integration
+    implementation "io.javalin.community.openapi:javalin-swagger-plugin:${openapiVersion}"
+
+    // Optional: ReDoc UI integration
+    // implementation "io.javalin.community.openapi:javalin-redoc-plugin:${openapiVersion}"
+
+    // Annotation processor (required for @OpenApi to generate spec at compile time)
+    annotationProcessor "io.javalin.community.openapi:openapi-annotation-processor:${openapiVersion}"
+    // If using Kotlin: kapt instead of annotationProcessor
 }
 
 
@@ -74,13 +95,10 @@ sourceSets {
             include '**/*.css'
             include '**/*.png'
             include '**/*.wav'
-            include 'beep.wav'
             include '**/*.xml'
-            include '**/fonts/*.ttf'
             include 'META-INF/MANIFEST.MF'
             include '**/db-migration/*.sql'
             include '**/scripts/*.sh'
-            include '**/scripts/*.bat'
             include 'version.txt'
         }
     }

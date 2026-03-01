@@ -3,7 +3,11 @@ package elite.vault.db.managers;
 import elite.vault.db.dao.MarketDao;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
+import elite.vault.eddn.dto.CommodityItemDto;
 import elite.vault.eddn.dto.CommodityMessageDto;
+
+import java.util.LinkedList;
+import java.util.List;
 
 public final class MarketManager {
 
@@ -33,4 +37,7 @@ public final class MarketManager {
         return entity;
     }
 
+    public List<CommodityItemDto> findCommodities(String commodity, String system, String station, boolean hasDemand, int minProfit, int limit, int offset) {
+        return new LinkedList<>();
+    }
 }
