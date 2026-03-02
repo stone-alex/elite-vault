@@ -9,14 +9,26 @@ create table if not exists market (
 create unique index if not exists idx_market_market_id on market(marketId);
 
 
+create table if not exists system (
+    systemAddress BIGINT PRIMARY KEY,
+    starName      text not null,
+    x             REAL NOT NULL,
+    y             REAL NOT NULL,
+    z             REAL NOT NULL,
+    date          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+
+
 create table if not exists stellar_object (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    bodyId integer default 0,
     timestamp     text   not null,
     starSystem    text   not null,
     systemAddress bigint not null,
-    x double not null,
-    y double not null,
-    z double not null,
+    x      double not null,
+    y      double not null,
+    z      double not null,
     data          text   not null
 );
 create unique index if not exists idx_stellar_object_system_address on stellar_object(systemAddress);

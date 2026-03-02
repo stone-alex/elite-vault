@@ -15,6 +15,7 @@ public class ScanSubscriber {
 
     @Subscribe
     public void onEvent(EddnMessageEvent event) {
+
         if (!event.isJournal() || !"Scan".equals(event.getEventType())) {
             return;
         }
@@ -22,7 +23,11 @@ public class ScanSubscriber {
         try {
             String json = INSTANCE.getObjectMapper().writeValueAsString(event.messageNode());
             ScanDto dto = GsonFactory.getGson().fromJson(json, ScanDto.class);
-            INSTANCE.getStellarObjectManager().save(dto);
+            if (dto.getDistanceFromArrivalLs() == 0) {
+                INSTANCE.getStarSystemManager().save(dto);
+            } else {
+                INSTANCE.getStellarObjectManager().save(dto);
+            }
         } catch (Exception e) {
             log.error("Unable to process EDEN event " + event.getEventType(), e);
         }

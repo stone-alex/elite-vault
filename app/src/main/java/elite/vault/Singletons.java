@@ -2,6 +2,7 @@ package elite.vault;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import elite.vault.db.managers.MarketManager;
+import elite.vault.db.managers.StarSystemManager;
 import elite.vault.db.managers.StellarObjectManager;
 
 public enum Singletons {
@@ -12,6 +13,7 @@ public enum Singletons {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StellarObjectManager stellarObjectManager = StellarObjectManager.getInstance();
     private final MarketManager marketManager = MarketManager.getInstance();
+    private final StarSystemManager starSystemManager = StarSystemManager.getInstance();
 
     ///
     public ObjectMapper getObjectMapper() {
@@ -24,6 +26,10 @@ public enum Singletons {
 
     public MarketManager getMarketManager() {
         return marketManager;
+    }
+
+    public StarSystemManager getStarSystemManager() {
+        return starSystemManager;
     }
 
     public void initialize() {

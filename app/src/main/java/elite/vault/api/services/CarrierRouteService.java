@@ -1,7 +1,7 @@
 package elite.vault.api.services;
 
-import elite.vault.db.dao.StellarObjectDao;
-import elite.vault.db.managers.StellarObjectManager;
+import elite.vault.db.dao.SystemDao;
+import elite.vault.db.managers.StarSystemManager;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.openapi.*;
@@ -51,11 +51,11 @@ public class CarrierRouteService {
             return;
         }
 
-        StellarObjectManager mgr = INSTANCE.getStellarObjectManager();
+        StarSystemManager mgr = INSTANCE.getStarSystemManager();
 
         try {
-            StellarObjectDao.StellarObject start = mgr.findByName(from.trim());
-            StellarObjectDao.StellarObject goal = mgr.findByName(to.trim());
+            SystemDao.StarSystem start = mgr.findByName(from.trim());
+            SystemDao.StarSystem goal = mgr.findByName(to.trim());
 
             if (start == null) {
                 ctx.status(HttpStatus.NOT_FOUND)
@@ -68,10 +68,10 @@ public class CarrierRouteService {
                 return;
             }
 
-            if (start.getStarSystem().equals(goal.getStarSystem())) {
+            if (start.getStarName().equals(goal.getStarName())) {
                 ctx.json(new RouteResponse(
                         from, to, 0,
-                        List.of(start.getStarSystem()),
+                        List.of(start.getStarName()),
                         "Same system – no jumps required"
                 ));
                 return;
@@ -92,9 +92,9 @@ public class CarrierRouteService {
     }
 
     private static RouteResult computeRoute(
-            StellarObjectDao.StellarObject start,
-            StellarObjectDao.StellarObject goal,
-            StellarObjectManager mgr) {
+            SystemDao.StarSystem start,
+            SystemDao.StarSystem goal,
+            StarSystemManager mgr) {
 
         Map<String, String> cameFrom = new HashMap<>();
         Map<String, Integer> gScore = new HashMap<>();
@@ -102,7 +102,7 @@ public class CarrierRouteService {
 
         PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fScore));
 
-        String startName = start.getStarSystem();
+        String startName = start.getStarName();
         gScore.put(startName, 0);
         double h = heuristic(start, goal);
         fScore.put(startName, h);
@@ -110,20 +110,20 @@ public class CarrierRouteService {
 
         while (!openSet.isEmpty()) {
             Node currNode = openSet.poll();
-            StellarObjectDao.StellarObject current = currNode.obj;
-            String currName = current.getStarSystem();
+            SystemDao.StarSystem current = currNode.obj;
+            String currName = current.getStarName();
 
             if (currNode.fScore > fScore.getOrDefault(currName, Double.POSITIVE_INFINITY)) {
                 continue;
             }
 
-            if (currName.equals(goal.getStarSystem())) {
+            if (currName.equals(goal.getStarName())) {
                 return new RouteResult(reconstructPath(cameFrom, currName), gScore.get(currName));
             }
 
             int tentativeG = gScore.get(currName) + 1;
 
-            List<StellarObjectDao.StellarObject> neighbors = mgr.findNeighbors(
+            List<SystemDao.StarSystem> neighbors = mgr.findNeighbors(
                     current.getX() - CARRIER_MAX_JUMP_LY, current.getX() + CARRIER_MAX_JUMP_LY,
                     current.getY() - CARRIER_MAX_JUMP_LY, current.getY() + CARRIER_MAX_JUMP_LY,
                     current.getZ() - CARRIER_MAX_JUMP_LY, current.getZ() + CARRIER_MAX_JUMP_LY,
@@ -131,8 +131,8 @@ public class CarrierRouteService {
                     currName
             );
 
-            for (StellarObjectDao.StellarObject neigh : neighbors) {
-                String nName = neigh.getStarSystem();
+            for (SystemDao.StarSystem neigh : neighbors) {
+                String nName = neigh.getStarName();
                 if (tentativeG < gScore.getOrDefault(nName, Integer.MAX_VALUE)) {
                     cameFrom.put(nName, currName);
                     gScore.put(nName, tentativeG);
@@ -147,7 +147,7 @@ public class CarrierRouteService {
         return new RouteResult(List.of(), -1);
     }
 
-    private static double heuristic(StellarObjectDao.StellarObject a, StellarObjectDao.StellarObject b) {
+    private static double heuristic(SystemDao.StarSystem a, SystemDao.StarSystem b) {
         double dx = a.getX() - b.getX();
         double dy = a.getY() - b.getY();
         double dz = a.getZ() - b.getZ();
@@ -180,6 +180,6 @@ public class CarrierRouteService {
     private record RouteResult(List<String> path, int jumps) {
     }
 
-    private record Node(StellarObjectDao.StellarObject obj, int g, double fScore) {
+    private record Node(SystemDao.StarSystem obj, int g, double fScore) {
     }
 }
