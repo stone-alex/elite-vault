@@ -6,7 +6,7 @@ import io.javalin.openapi.*;
 
 import java.util.List;
 
-import static elite.vault.Singletons.INSTANCE;
+import static elite.vault.Singletons.SINGLETONS;
 
 public class CommoditiesService {
 
@@ -41,7 +41,7 @@ public class CommoditiesService {
         int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
 
         // Call your manager (add method if needed)
-        List<CommodityItemDto> results = INSTANCE.getMarketManager().findCommodities(
+        List<CommodityItemDto> results = SINGLETONS.getMarketManager().findCommodities(
                 commodity, system, station, hasDemand, minProfit, limit, offset
         );
         ctx.json(results);

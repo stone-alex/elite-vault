@@ -7,7 +7,7 @@ import elite.vault.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static elite.vault.Singletons.INSTANCE;
+import static elite.vault.Singletons.SINGLETONS;
 
 public class ScanSubscriber {
 
@@ -21,12 +21,12 @@ public class ScanSubscriber {
         }
 
         try {
-            String json = INSTANCE.getObjectMapper().writeValueAsString(event.messageNode());
+            String json = SINGLETONS.getObjectMapper().writeValueAsString(event.messageNode());
             ScanDto dto = GsonFactory.getGson().fromJson(json, ScanDto.class);
             if (dto.getDistanceFromArrivalLs() == 0) {
-                INSTANCE.getStarSystemManager().save(dto);
+                SINGLETONS.getStarSystemManager().save(dto);
             } else {
-                INSTANCE.getStellarObjectManager().save(dto);
+                SINGLETONS.getStellarObjectManager().save(dto);
             }
         } catch (Exception e) {
             log.error("Unable to process EDEN event " + event.getEventType(), e);

@@ -8,7 +8,7 @@ import io.javalin.openapi.*;
 
 import java.util.*;
 
-import static elite.vault.Singletons.INSTANCE;
+import static elite.vault.Singletons.SINGLETONS;
 
 public class CarrierRouteService {
 
@@ -51,7 +51,7 @@ public class CarrierRouteService {
             return;
         }
 
-        StarSystemManager mgr = INSTANCE.getStarSystemManager();
+        StarSystemManager mgr = SINGLETONS.getStarSystemManager();
 
         try {
             SystemDao.StarSystem start = mgr.findByName(from.trim());

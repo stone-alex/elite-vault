@@ -7,7 +7,7 @@ import elite.vault.db.managers.StellarObjectManager;
 
 public enum Singletons {
 
-    INSTANCE;
+    SINGLETONS;
 
     ///
     private final ObjectMapper objectMapper = new ObjectMapper();

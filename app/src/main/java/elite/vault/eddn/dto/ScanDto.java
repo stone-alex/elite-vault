@@ -7,6 +7,14 @@ import java.util.Map;
 
 public class ScanDto extends BaseDto {
 
+    @SerializedName("type")
+    private String type;
+
+    @SerializedName("subType")
+    private String subType;
+
+
+
     @SerializedName("AscendingNode")
     private Double ascendingNode;
 
@@ -108,6 +116,116 @@ public class ScanDto extends BaseDto {
 
     @SerializedName("WasMapped")
     private Boolean wasMapped;
+
+    @SerializedName("Rings")
+    private List<RingDto> rings;                    // array of rings (very common on gas giants & some stars)
+
+    @SerializedName("Materials")
+    private Map<String, Double> materials;          // e.g. {"Iron": 0.32, "Nickel": 0.21 ...}
+
+    @SerializedName("StarType")
+    private String starType;                        // "O", "M", "Black Hole", "Neutron", etc.
+
+    @SerializedName("Luminosity")
+    private String luminosity;                      // "V", "VII", "Vz", etc.
+
+    @SerializedName("SpectralClass")
+    private String spectralClass;                   // "O0", "T7", "Y2", etc.
+
+    @SerializedName("Age_MY")
+    private Long ageMy;                             // star age in millions of years
+
+    @SerializedName("ReserveLevel")
+    private String reserveLevel;                    // "Pristine", "Depleted", "Common", etc. (for rings)
+
+    // === Nice-to-have (FSS signals & modern extras) ===
+    @SerializedName("Signals")
+    private List<SignalDto> signals;                // from FSSBodySignals (bio, geo, etc.)
+
+    @SerializedName("Genus")
+    private List<String> genus;                     // Odyssey biology genus
+
+    @SerializedName("SolidComposition")
+    private Map<String, Double> solidComposition;   // for rocky worlds
+
+    @SerializedName("IsLandable")
+    private Boolean isLandable;                     // some tools send this instead of Landable
+
+    // === Optional but harmless (Spanhs compatibility) ===
+    @SerializedName("mainStar")
+    private Boolean mainStar;
+
+    @SerializedName("updateTime")
+    private String updateTime;
+
+    public static class RingDto {
+        @SerializedName("Name") private String name;
+        @SerializedName("RingClass") private String ringClass;   // "Metal Rich", "Icy", etc.
+        @SerializedName("MassMT") private Double massMt;
+        @SerializedName("InnerRad") private Double innerRad;
+        @SerializedName("OuterRad") private Double outerRad;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRingClass() {
+            return ringClass;
+        }
+
+        public void setRingClass(String ringClass) {
+            this.ringClass = ringClass;
+        }
+
+        public Double getMassMt() {
+            return massMt;
+        }
+
+        public void setMassMt(Double massMt) {
+            this.massMt = massMt;
+        }
+
+        public Double getInnerRad() {
+            return innerRad;
+        }
+
+        public void setInnerRad(Double innerRad) {
+            this.innerRad = innerRad;
+        }
+
+        public Double getOuterRad() {
+            return outerRad;
+        }
+
+        public void setOuterRad(Double outerRad) {
+            this.outerRad = outerRad;
+        }
+    }
+
+    public static class SignalDto {
+        @SerializedName("Type") private String type;   // "Biological", "Geological", etc.
+        @SerializedName("Count") private Integer count;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public Integer getCount() {
+            return count;
+        }
+
+        public void setCount(Integer count) {
+            this.count = count;
+        }
+    }
 
     public Double getAscendingNode() {
         return ascendingNode;
@@ -379,5 +497,118 @@ public class ScanDto extends BaseDto {
 
     public void setWasMapped(Boolean wasMapped) {
         this.wasMapped = wasMapped;
+    }
+
+    public List<RingDto> getRings() {
+
+        return rings;
+    }
+
+    public void setRings(List<RingDto> rings) {
+        this.rings = rings;
+    }
+
+    public Map<String, Double> getMaterials() {
+        return materials;
+    }
+
+    public void setMaterials(Map<String, Double> materials) {
+        this.materials = materials;
+    }
+
+    public String getStarType() {
+        return starType;
+    }
+
+    public void setStarType(String starType) {
+        this.starType = starType;
+    }
+
+    public String getLuminosity() {
+        return luminosity;
+    }
+
+    public void setLuminosity(String luminosity) {
+        this.luminosity = luminosity;
+    }
+
+    public String getSpectralClass() {
+        return spectralClass;
+    }
+
+    public void setSpectralClass(String spectralClass) {
+        this.spectralClass = spectralClass;
+    }
+
+    public Long getAgeMy() {
+        return ageMy;
+    }
+
+    public void setAgeMy(Long ageMy) {
+        this.ageMy = ageMy;
+    }
+
+    public String getReserveLevel() {
+        return reserveLevel;
+    }
+
+    public void setReserveLevel(String reserveLevel) {
+        this.reserveLevel = reserveLevel;
+    }
+
+    public List<SignalDto> getSignals() {
+        return signals;
+    }
+
+    public void setSignals(List<SignalDto> signals) {
+        this.signals = signals;
+    }
+
+    public List<String> getGenus() {
+        return genus;
+    }
+
+    public void setGenus(List<String> genus) {
+        this.genus = genus;
+    }
+
+    public Map<String, Double> getSolidComposition() {
+        return solidComposition;
+    }
+
+    public void setSolidComposition(Map<String, Double> solidComposition) {
+        this.solidComposition = solidComposition;
+    }
+
+    public Boolean getMainStar() {
+        return mainStar;
+    }
+
+    public void setMainStar(Boolean mainStar) {
+        this.mainStar = mainStar;
+    }
+
+    public String getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(String updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getSubType() {
+        return subType;
+    }
+
+    public void setSubType(String subType) {
+        this.subType = subType;
     }
 }

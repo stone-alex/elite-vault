@@ -7,7 +7,7 @@ import elite.vault.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static elite.vault.Singletons.INSTANCE;
+import static elite.vault.Singletons.SINGLETONS;
 
 public class CommoditySubscriber {
 
@@ -21,9 +21,9 @@ public class CommoditySubscriber {
 
         // No need to check eventType() — it's always null here
         try {
-            String json = INSTANCE.getObjectMapper().writeValueAsString(event.messageNode());
+            String json = SINGLETONS.getObjectMapper().writeValueAsString(event.messageNode());
             CommodityMessageDto dto = GsonFactory.getGson().fromJson(json, CommodityMessageDto.class);
-            INSTANCE.getMarketManager().save(dto);
+            SINGLETONS.getMarketManager().save(dto);
         } catch (Exception e) {
             log.warn("Failed to process commodity/3 message", e);
         }
