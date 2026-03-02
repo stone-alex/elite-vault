@@ -1,4 +1,4 @@
-package elite.vault.api.search;
+package elite.vault.api.services;
 
 import elite.vault.eddn.dto.CommodityItemDto;
 import io.javalin.http.Context;
@@ -8,14 +8,14 @@ import java.util.List;
 
 import static elite.vault.Singletons.INSTANCE;
 
-public class CommoditiesSearch {
+public class CommoditiesService {
 
     @OpenApi(
             summary = "Search commodities in local EDDN vault",
             description = "Filter market data by commodity, system, station, demand/supply, min profit. Paginated results from your stored data.",
             operationId = "searchCommodities",
             tags = {"Commodities", "Market"},
-            path = "/api/v1/commodities/search",
+            path = "/api/v1/search/commodities",
             methods = {HttpMethod.GET},
             queryParams = {
                     @OpenApiParam(name = "commodity", description = "Commodity name (e.g. Painite)"),
