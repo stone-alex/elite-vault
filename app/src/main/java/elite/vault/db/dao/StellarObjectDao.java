@@ -72,46 +72,14 @@ public interface StellarObjectDao {
     class StellarObjectMapper implements RowMapper<StellarObject> {
         @Override
         public StellarObject map(ResultSet rs, StatementContext ctx) throws SQLException {
-            System.out.println("Mapper called for query: " + ctx.getRawSql());
-
-            // Log all available column labels
-            java.sql.ResultSetMetaData meta = rs.getMetaData();
-            int colCount = meta.getColumnCount();
-            System.out.println("Columns in ResultSet (" + colCount + "):");
-            for (int i = 1; i <= colCount; i++) {
-                System.out.println("  " + i + ": label='" + meta.getColumnLabel(i) +
-                        "', name='" + meta.getColumnName(i) +
-                        "', type=" + meta.getColumnTypeName(i));
-            }
-
             StellarObject entity = new StellarObject();
-
-            try {
-                entity.setTimestamp(rs.getString("timestamp"));
-                System.out.println("timestamp = " + entity.getTimestamp());
-
-                entity.setStarSystem(rs.getString("starSystem"));
-                System.out.println("starSystem = " + entity.getStarSystem());
-
-                entity.setSystemAddress(rs.getLong("systemAddress"));
-                System.out.println("systemAddress = " + entity.getSystemAddress());
-
-                entity.setX(rs.getDouble("x"));
-                System.out.println("x = " + entity.getX());
-
-                entity.setY(rs.getDouble("y"));
-                System.out.println("y = " + entity.getY());
-
-                entity.setZ(rs.getDouble("z"));
-                System.out.println("z = " + entity.getZ());
-
-                entity.setData(rs.getString("data"));
-                System.out.println("data length = " + (entity.getData() != null ? entity.getData().length() : "null"));
-            } catch (SQLException e) {
-                System.err.println("Mapping failed: " + e.getMessage());
-                throw e;  // rethrow to see in caller
-            }
-
+            entity.setTimestamp(rs.getString("timestamp"));
+            entity.setStarSystem(rs.getString("starSystem"));
+            entity.setSystemAddress(rs.getLong("systemAddress"));
+            entity.setX(rs.getDouble("x"));
+            entity.setY(rs.getDouble("y"));
+            entity.setZ(rs.getDouble("z"));
+            entity.setData(rs.getString("data"));
             return entity;
         }
     }
