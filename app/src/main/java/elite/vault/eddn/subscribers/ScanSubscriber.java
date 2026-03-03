@@ -25,10 +25,10 @@ public class ScanSubscriber {
             ScanDto dto = GsonFactory.getGson().fromJson(json, ScanDto.class);
             if (dto.getDistanceFromArrivalLs() == 0) {
                 SINGLETONS.getStarSystemManager().save(dto);
-                System.out.println("EDDM Star System " + dto.getStarSystem());
+                log.info("EDDM Star System " + dto.getStarSystem());
             } else {
                 SINGLETONS.getStellarObjectManager().save(dto);
-                System.out.println("EDDM Stellar Object " + dto.getStarSystem());
+                log.info("EDDM Stellar Object " + dto.getStarSystem());
             }
         } catch (Exception e) {
             log.error("Unable to process EDEN event " + event.getEventType(), e);

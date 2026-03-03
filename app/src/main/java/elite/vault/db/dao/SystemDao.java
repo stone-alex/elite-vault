@@ -49,7 +49,7 @@ public interface SystemDao {
 
     @SqlQuery("""
             SELECT *
-            FROM system
+            FROM star_system
             WHERE
               sector IN (<sectors>)
               AND starName != :currentName

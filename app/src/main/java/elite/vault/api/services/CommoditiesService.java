@@ -19,12 +19,7 @@ public class CommoditiesService {
             methods = {HttpMethod.GET},
             queryParams = {
                     @OpenApiParam(name = "commodity", description = "Commodity name (e.g. Painite)"),
-                    @OpenApiParam(name = "system", description = "System name (e.g. Sol)"),
-                    @OpenApiParam(name = "station", description = "Station name"),
-                    @OpenApiParam(name = "hasDemand", type = Boolean.class, description = "Only entries with demand > 0"),
-                    @OpenApiParam(name = "minProfit", type = Integer.class, description = "Minimum sellPrice - buyPrice"),
-                    @OpenApiParam(name = "limit", type = Integer.class, description = "Results per page", example = "50"),
-                    @OpenApiParam(name = "offset", type = Integer.class, description = "Page offset", example = "0")
+                    @OpenApiParam(name = "hasDemand", type = Boolean.class, description = "Only entries with demand > 0")
             },
             responses = {
                     @OpenApiResponse(status = "200", content = {@OpenApiContent(from = CommodityItemDto[].class)}),
@@ -33,17 +28,10 @@ public class CommoditiesService {
     )
     public static void searchCommodities(Context ctx) {
         String commodity = ctx.queryParam("commodity");
-        String system = ctx.queryParam("system");
-        String station = ctx.queryParam("station");
         boolean hasDemand = "true".equals(ctx.queryParam("hasDemand"));
-        int minProfit = ctx.queryParamAsClass("minProfit", Integer.class).getOrDefault(0);
-        int limit = ctx.queryParamAsClass("limit", Integer.class).getOrDefault(50);
-        int offset = ctx.queryParamAsClass("offset", Integer.class).getOrDefault(0);
 
         // Call your manager (add method if needed)
-        List<CommodityItemDto> results = SINGLETONS.getMarketManager().findCommodities(
-                commodity, system, station, hasDemand, minProfit, limit, offset
-        );
+        List<CommodityItemDto> results = SINGLETONS.getMarketManager().findCommodities(commodity, hasDemand);
         ctx.json(results);
     }
 }

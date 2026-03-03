@@ -40,39 +40,38 @@ CREATE TABLE IF NOT EXISTS stellar_object (
 -- ----------------------------------------------------------------------------
 -- Indexes (safe to re-run — MariaDB ignores if already exists)
 -- ----------------------------------------------------------------------------
+CREATE UNIQUE INDEX IF NOT EXISTS idx_market_market_id ON market(marketId);
+CREATE INDEX IF NOT EXISTS idx_system_starname ON star_system(starName);
+CREATE INDEX IF NOT EXISTS idx_system_x_y_z ON star_system(x, y, z);
+CREATE INDEX IF NOT EXISTS idx_system_x ON star_system(x);
+CREATE INDEX IF NOT EXISTS idx_system_y ON star_system(y);
+CREATE INDEX IF NOT EXISTS idx_system_z ON star_system(z);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stellar_object_system_address ON stellar_object(systemAddress);
+CREATE INDEX IF NOT EXISTS idx_stellar_primary ON stellar_object(starSystem);
+CREATE INDEX IF NOT EXISTS idx_stellar_x ON stellar_object(x);
+CREATE INDEX IF NOT EXISTS idx_stellar_y ON stellar_object(y);
+CREATE INDEX IF NOT EXISTS idx_stellar_z ON stellar_object(z);
+CREATE INDEX IF NOT EXISTS idx_stellar_xyz ON stellar_object(x, y, z);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_market_market_id
-    ON market(marketId);
+-- ----------------------------------------------------------------------------
+-- Commodity
+-- ----------------------------------------------------------------------------
+create table if not exists market_commodity (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    timestamp     text    NOT NULL,
+    marketId      bigint  not null,
+    commodity     text    not null,
+    buyPrice      double  not null,
+    sellPrice     double  not null,
+    stock         integer not null,
+    demand        integer not null,
+    systemAddress BIGINT  NOT NULL,
+    x             DOUBLE  NOT NULL,
+    y             DOUBLE  NOT NULL,
+    z             DOUBLE  NOT NULL
+);
 
-CREATE INDEX IF NOT EXISTS idx_system_starname
-    ON star_system(starName);
-
-CREATE INDEX IF NOT EXISTS idx_system_x_y_z
-    ON star_system(x, y, z);
-
-CREATE INDEX IF NOT EXISTS idx_system_x
-    ON star_system(x);
-
-CREATE INDEX IF NOT EXISTS idx_system_y
-    ON star_system(y);
-
-CREATE INDEX IF NOT EXISTS idx_system_z
-    ON star_system(z);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_stellar_object_system_address
-    ON stellar_object(systemAddress);
-
-CREATE INDEX IF NOT EXISTS idx_stellar_primary
-    ON stellar_object(starSystem);
-
-CREATE INDEX IF NOT EXISTS idx_stellar_x
-    ON stellar_object(x);
-
-CREATE INDEX IF NOT EXISTS idx_stellar_y
-    ON stellar_object(y);
-
-CREATE INDEX IF NOT EXISTS idx_stellar_z
-    ON stellar_object(z);
-
-CREATE INDEX IF NOT EXISTS idx_stellar_xyz
-    ON stellar_object(x, y, z);
+create index if not exists idx_market_commodity_system_address on market_commodity(systemaddress);
+create index if not exists idx_market_commodity_x on market_commodity(x);
+create index if not exists idx_market_commodity_y on market_commodity(y);
+create index if not exists idx_market_commodity_z on market_commodity(z);

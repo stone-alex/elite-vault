@@ -4,6 +4,7 @@ import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.statement.SqlScript;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.sql.ResultSet;
@@ -12,14 +13,6 @@ import java.sql.SQLException;
 @RegisterRowMapper(MarketDao.MarketMapper.class)
 public interface MarketDao {
 
-    /**
-     * Upserts a market entry.
-     * - Inserts if marketId doesn't exist
-     * - Updates all fields if marketId already exists (latest data wins)
-     * <p>
-     * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
-     * Assumes marketId has a UNIQUE index or PRIMARY KEY.
-     */
     @SqlUpdate("""
             INSERT INTO market (marketId, timestamp, starSystem, stationName, data)
             VALUES (:marketId, :timestamp, :starSystem, :stationName, :data)
@@ -30,6 +23,12 @@ public interface MarketDao {
                 data        = VALUES(data)
             """)
     void upsert(@BindBean Market data);
+
+    @SqlScript("""
+            delete from market_commodity where timestamp < now() - interval 3 hour;
+            delete from market where timestamp < now() - interval 3 hour;
+            """)
+    void prune();
 
 
     class MarketMapper implements RowMapper<Market> {

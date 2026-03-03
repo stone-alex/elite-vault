@@ -12,10 +12,10 @@ public class CommodityItemDto {
     private Integer meanPrice;
 
     @SerializedName("buyPrice")
-    private Integer buyPrice;
+    private Double buyPrice;
 
     @SerializedName("sellPrice")
-    private Integer sellPrice;
+    private Double sellPrice;
 
     @SerializedName("stock")
     private Integer stock;
@@ -49,19 +49,19 @@ public class CommodityItemDto {
         this.meanPrice = meanPrice;
     }
 
-    public Integer getBuyPrice() {
+    public Double getBuyPrice() {
         return buyPrice;
     }
 
-    public void setBuyPrice(Integer buyPrice) {
+    public void setBuyPrice(Double buyPrice) {
         this.buyPrice = buyPrice;
     }
 
-    public Integer getSellPrice() {
+    public Double getSellPrice() {
         return sellPrice;
     }
 
-    public void setSellPrice(Integer sellPrice) {
+    public void setSellPrice(Double sellPrice) {
         this.sellPrice = sellPrice;
     }
 
