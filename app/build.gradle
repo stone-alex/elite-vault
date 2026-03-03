@@ -69,6 +69,9 @@ dependencies {
     // Annotation processor (required for @OpenApi to generate spec at compile time)
     annotationProcessor "io.javalin.community.openapi:openapi-annotation-processor:${openapiVersion}"
     // If using Kotlin: kapt instead of annotationProcessor
+
+    /// MariaDB
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.5.0'
 }
 
 
@@ -83,7 +86,7 @@ tasks.withType(JavaCompile) {
 }
 
 application {
-    mainClass = 'elite.vault.Ingest'
+    mainClass = 'elite.vault.bootstrap.InitialImport'
 }
 
 sourceSets {
@@ -107,7 +110,7 @@ sourceSets {
 shadowJar {
     archiveFileName = 'elite_vault.jar'
     manifest {
-        attributes 'Main-Class': 'elite.vault.Ingest'
+        attributes 'Main-Class': 'elite.vault.bootstrap.InitialImport'
     }
     mergeServiceFiles()
     destinationDirectory = file("${rootProject.projectDir}/distribution")

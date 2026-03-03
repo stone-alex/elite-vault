@@ -13,7 +13,6 @@ import static elite.vault.Singletons.SINGLETONS;
 public class CarrierRouteService {
 
     private static final double CARRIER_MAX_JUMP_LY = 500.0;
-    private static final double MAX_JUMP_SQ = CARRIER_MAX_JUMP_LY * CARRIER_MAX_JUMP_LY;
 
     @OpenApi(
             summary = "Find optimal fleet carrier route",
@@ -58,13 +57,11 @@ public class CarrierRouteService {
             SystemDao.StarSystem goal = mgr.findByName(to.trim());
 
             if (start == null) {
-                ctx.status(HttpStatus.NOT_FOUND)
-                        .json(new ErrorResponse("Start system not found in vault: " + from));
+                ctx.status(HttpStatus.NOT_FOUND).json(new ErrorResponse("Start system not found in vault: " + from));
                 return;
             }
             if (goal == null) {
-                ctx.status(HttpStatus.NOT_FOUND)
-                        .json(new ErrorResponse("Destination system not found in vault: " + to));
+                ctx.status(HttpStatus.NOT_FOUND).json(new ErrorResponse("Destination system not found in vault: " + to));
                 return;
             }
 
@@ -91,10 +88,7 @@ public class CarrierRouteService {
         }
     }
 
-    private static RouteResult computeRoute(
-            SystemDao.StarSystem start,
-            SystemDao.StarSystem goal,
-            StarSystemManager mgr) {
+    private static RouteResult computeRoute(SystemDao.StarSystem start, SystemDao.StarSystem goal, StarSystemManager mgr) {
 
         Map<String, String> cameFrom = new HashMap<>();
         Map<String, Integer> gScore = new HashMap<>();
@@ -128,7 +122,8 @@ public class CarrierRouteService {
                     current.getY() - CARRIER_MAX_JUMP_LY, current.getY() + CARRIER_MAX_JUMP_LY,
                     current.getZ() - CARRIER_MAX_JUMP_LY, current.getZ() + CARRIER_MAX_JUMP_LY,
                     current.getX(), current.getY(), current.getZ(),
-                    currName
+                    currName,
+                    current.getSector()
             );
 
             for (SystemDao.StarSystem neigh : neighbors) {
@@ -147,20 +142,37 @@ public class CarrierRouteService {
         return new RouteResult(List.of(), -1);
     }
 
-    private static double heuristic(SystemDao.StarSystem a, SystemDao.StarSystem b) {
-        double dx = a.getX() - b.getX();
-        double dy = a.getY() - b.getY();
-        double dz = a.getZ() - b.getZ();
-        return Math.ceil(Math.sqrt(dx * dx + dy * dy + dz * dz) / CARRIER_MAX_JUMP_LY);
+    private static double heuristic(SystemDao.StarSystem start, SystemDao.StarSystem destination) {
+        double deltaX = Math.abs(start.getX() - destination.getX());
+        double deltaY = Math.abs(start.getY() - destination.getY());
+        double deltaZ = Math.abs(start.getZ() - destination.getZ());
+
+        // Because galaxy is thin in Z → large Z differences are expensive
+        double maxAxis = Math.max(deltaX, Math.max(deltaY, deltaZ));
+        double midAxis = Math.max(Math.min(deltaX, deltaY), Math.min(Math.max(deltaX, deltaY), deltaZ)); // rough median
+        double smallAxis = deltaX + deltaY + deltaZ - maxAxis - midAxis;
+
+        // Very cheap approximation that is still admissible
+        return Math.ceil((maxAxis + 1.3 * midAxis + 1.8 * smallAxis) / 500.0);
     }
 
     private static List<String> reconstructPath(Map<String, String> cameFrom, String current) {
         List<String> path = new ArrayList<>();
-        while (current != null) {
-            path.add(current);
-            current = cameFrom.get(current);
+
+        // Start from the *second*-to-last node (skip origin)
+        String at = current;
+        while (at != null) {
+            path.add(at);
+            at = cameFrom.get(at);
         }
+
         Collections.reverse(path);
+
+        // Remove the first element (which is now the start system)
+        if (!path.isEmpty()) {
+            path.removeFirst();
+        }
+
         return path;
     }
 

@@ -1,44 +1,79 @@
-create table if not exists market (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp   text   not null,
-    marketId    bigint not null,
-    starSystem  text   not null,
-    stationName text   not null,
-    data        text   not null
-);
-create unique index if not exists idx_market_market_id on market(marketId);
+-- Force consistent character set and collation for the session
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET COLLATION_CONNECTION = 'utf8mb4_unicode_ci';
 
+-- ----------------------------------------------------------------------------
+-- Tables (created or altered with IF NOT EXISTS / safe defaults)
+-- ----------------------------------------------------------------------------
 
-create table if not exists system (
+CREATE TABLE IF NOT EXISTS market (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    timestamp   text                                                          NOT NULL,
+    marketId    BIGINT                                                        NOT NULL,
+    starSystem  VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    stationName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    data        MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
+) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS star_system (
     systemAddress BIGINT PRIMARY KEY,
-    starName      text not null,
-    x             REAL NOT NULL,
-    y             REAL NOT NULL,
-    z             REAL NOT NULL,
-    date          TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    starName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    sector   VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    x        DOUBLE                                                        NOT NULL,
+    y        DOUBLE                                                        NOT NULL,
+    z        DOUBLE                                                        NOT NULL,
+    date     DATETIME                                                      NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS stellar_object (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    bodyId        BIGINT                                                        NOT NULL DEFAULT 0,
+    timestamp     text                                                          NOT NULL,
+    starSystem    VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    systemAddress BIGINT                                                        NOT NULL,
+    x             DOUBLE                                                        NOT NULL,
+    y             DOUBLE                                                        NOT NULL,
+    z             DOUBLE                                                        NOT NULL,
+    data          MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
+) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- ----------------------------------------------------------------------------
+-- Indexes (safe to re-run — MariaDB ignores if already exists)
+-- ----------------------------------------------------------------------------
 
-create table if not exists stellar_object (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    bodyId integer default 0,
-    timestamp     text   not null,
-    starSystem    text   not null,
-    systemAddress bigint not null,
-    x      double not null,
-    y      double not null,
-    z      double not null,
-    data          text   not null
-);
-create unique index if not exists idx_stellar_object_system_address on stellar_object(systemAddress);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_market_market_id
+    ON market(marketId);
 
-CREATE INDEX IF NOT EXISTS idx_stellar_primary ON stellar_object(starSystem)
-    WHERE json_extract(data, '$.DistanceFromArrivalLS') = 0;
+CREATE INDEX IF NOT EXISTS idx_system_starname
+    ON star_system(starName);
 
-CREATE INDEX IF NOT EXISTS idx_stellar_x ON stellar_object(x);
-CREATE INDEX IF NOT EXISTS idx_stellar_y ON stellar_object(y);
-CREATE INDEX IF NOT EXISTS idx_stellar_z ON stellar_object(z);
+CREATE INDEX IF NOT EXISTS idx_system_x_y_z
+    ON star_system(x, y, z);
 
--- Composite helps a bit more on range queries
-CREATE INDEX IF NOT EXISTS idx_stellar_xyz ON stellar_object(x, y, z);
+CREATE INDEX IF NOT EXISTS idx_system_x
+    ON star_system(x);
+
+CREATE INDEX IF NOT EXISTS idx_system_y
+    ON star_system(y);
+
+CREATE INDEX IF NOT EXISTS idx_system_z
+    ON star_system(z);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stellar_object_system_address
+    ON stellar_object(systemAddress);
+
+CREATE INDEX IF NOT EXISTS idx_stellar_primary
+    ON stellar_object(starSystem);
+
+CREATE INDEX IF NOT EXISTS idx_stellar_x
+    ON stellar_object(x);
+
+CREATE INDEX IF NOT EXISTS idx_stellar_y
+    ON stellar_object(y);
+
+CREATE INDEX IF NOT EXISTS idx_stellar_z
+    ON stellar_object(z);
+
+CREATE INDEX IF NOT EXISTS idx_stellar_xyz
+    ON stellar_object(x, y, z);

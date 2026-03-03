@@ -1,11 +1,12 @@
 package elite.vault.db.util;
 
-import elite.vault.util.AppPaths;
+import elite.vault.ConfigManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.*;
@@ -16,8 +17,11 @@ import java.util.Set;
 
 
 public class Database {
+    private static final Logger log = LogManager.getLogger(Database.class);
+
 
     private static final Jdbi JDBI;
+    private static final ConfigManager conf = ConfigManager.getInstance();
 
     private static void migrateIfNeeded() {
         JDBI.useHandle(handle -> {
@@ -104,31 +108,45 @@ public class Database {
     }
 
     static {
-        Path dbPath;
-        try {
-            dbPath = AppPaths.getDatabasePath();
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to create database directory " + e.getMessage(), e);
+        String host = conf.getSystemKey(ConfigManager.DB_SERVER);     // e.g. "127.0.0.1" or "db.example.com"
+        String port = conf.getSystemKey(ConfigManager.DB_PORT);       // usually "3306"
+        String dbName = conf.getSystemKey(ConfigManager.DB_NAME);
+        String user = conf.getSystemKey(ConfigManager.DB_USER);
+        String pass = conf.getSystemKey(ConfigManager.DB_PASS);
+
+        // 2025–2026 recommended MariaDB JDBC URL for good ingest performance
+        String jdbcUrl = String.format(
+                "jdbc:mariadb://%s:%s/%s" +
+                        "?useUnicode=true" +
+                        "&characterEncoding=UTF-8" +
+                        "&connectionAttributes=program_name:EliteVault" +           // nice for server monitoring
+                        "&useServerPrepStmts=true" +                                // binary protocol (good for repeated queries)
+                        "&cachePrepStmts=true" +
+                        "&prepStmtCacheSize=300" +
+                        "&prepStmtCacheSqlLimit=4096" +
+                        "&rewriteBatchedStatements=true" +                          // critical: turns many INSERTs into one multi-row INSERT
+                        "&socketTimeout=45000" +                                    // 45 seconds
+                        "&connectTimeout=15000" +
+                        "&useLocalSessionState=true" +
+                        "&allowPublicKeyRetrieval=true",                            // only if needed for password auth
+                host, port, dbName
+        );
+
+        JDBI = Jdbi.create(jdbcUrl, user, pass)
+                .installPlugin(new SqlObjectPlugin());
+
+        // Early connection validation + log basic info
+        try (var h = JDBI.open()) {
+            String version = h.createQuery("SELECT VERSION()").mapTo(String.class).one();
+            log.info("Connected to MariaDB version: {}", version);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "MariaDB connection failed. Check host/port/credentials/database existence.\n" +
+                            "URL was: " + jdbcUrl.replaceAll("(?<=password=)[^&]+", "****"), e);
         }
 
-
-        String url = "jdbc:sqlite:" + dbPath
-                + "?journal_mode=WAL"      // safe concurrent reads/writes
-                + "&busy_timeout=5000"     // don’t deadlock if two threads hit it
-                + "&synchronous=NORMAL"    // fast + still safe on Linux
-                + "&foreign_keys=ON";      // Ensure Foreign Keys are enforced on every connection
-
-        JDBI = Jdbi.create(url).installPlugin(new SqlObjectPlugin());
-
-        // Open once so the file gets created if missing and persistent pragmas are set
+        // Attach all DAOs from the package (unchanged logic)
         JDBI.withHandle(h -> {
-            h.execute("PRAGMA foreign_keys = ON;");           // always good
-            h.execute("PRAGMA case_sensitive_like = OFF;");   // makes LIKE ignore case
-            h.execute("PRAGMA journal_mode = WAL;");          // safe + fast
-            h.execute("PRAGMA synchronous = NORMAL;");        // fast + still safe on Linux
-            h.execute("PRAGMA busy_timeout = 5000;");         // avoid lock errors
-
-            // Automatically attach all DAO classes from elite.intel.db.dao package
             try {
                 Set<Class<?>> daoClasses = findDaoClasses("elite.vault.db.dao");
                 for (Class<?> daoClass : daoClasses) {
@@ -137,12 +155,9 @@ public class Database {
             } catch (Exception e) {
                 throw new RuntimeException("Failed to attach DAO classes", e);
             }
-
             return null;
         });
 
-
-        // Run migrations (see below)
         migrateIfNeeded();
     }
 }

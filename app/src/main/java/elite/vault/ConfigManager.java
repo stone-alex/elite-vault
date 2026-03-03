@@ -17,6 +17,14 @@ public class ConfigManager {
     public static final String SYSTEM_CONFIG_FILENAME = "elite-vault.conf";
     // Config keys
     public static final String SPANSH_DATA = "spansh-data";
+    public static final String DB_SERVER = "db-server";
+    public static final String DB_PORT = "db-port";
+    public static final String DB_USER = "db-user";
+    public static final String DB_PASS = "db-pass";
+    public static final String DB_NAME = "db-name";
+    public static final String DB_SQLITE_PATH = "sqlite-path";
+
+
     private static final Logger log = LogManager.getLogger(ConfigManager.class);
     private static final ConfigManager INSTANCE = new ConfigManager();
     private final Map<String, String> DEFAULT_SYSTEM_CONFIG = new LinkedHashMap<>();

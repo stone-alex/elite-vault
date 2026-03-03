@@ -49,7 +49,7 @@ Elite Intel / Other Clients
 
 - Language: Java (21+)
 - Build: Gradle (multi-module: `:commons`, `:ingest`, `:api`)
-- Database: SQLite (embedded, default) or MariaDB/MySQL
+- Database: MariaDB/MySQL/PostgreSQL + PostGIS (TBD depending on performance)
 - DB access: JDBI 3
 - JSON: Gson (primary) + Jackson (for YAML if needed)
 - HTTP (API): Spring Boot (standalone) or plain HttpServer

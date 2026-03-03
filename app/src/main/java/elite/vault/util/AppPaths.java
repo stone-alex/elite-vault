@@ -1,6 +1,8 @@
 package elite.vault.util;
 
 
+import elite.vault.ConfigManager;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,19 +21,22 @@ public final class AppPaths {
 
     public static Path getDatabasePath() throws IOException {
         Path base;
-        if (OsDetector.getOs() == OsDetector.OS.LINUX || OsDetector.getOs() == OsDetector.OS.MAC) {
-            String dataHome = System.getenv("XDG_DATA_HOME");
-            base = dataHome != null && !dataHome.isEmpty()
-                    ? Path.of(dataHome)
-                    : Path.of(System.getProperty("user.home"), ".local/share");
-        } else if (OsDetector.getOs() == OsDetector.OS.WINDOWS) {
-            String localAppData = System.getenv("LOCALAPPDATA");
-            if (localAppData == null || localAppData.isEmpty()) {
-                throw new IllegalStateException("LOCALAPPDATA not set");
+        String sqlitePath = ConfigManager.getInstance().getSystemKey(ConfigManager.DB_SQLITE_PATH);
+        if (sqlitePath == null || sqlitePath.isEmpty()) {
+            if (OsDetector.getOs() == OsDetector.OS.LINUX || OsDetector.getOs() == OsDetector.OS.MAC) {
+                String dataHome = System.getenv("XDG_DATA_HOME");
+                base = dataHome != null && !dataHome.isEmpty() ? Path.of(dataHome) : Path.of(System.getProperty("user.home"), ".local/share");
+            } else if (OsDetector.getOs() == OsDetector.OS.WINDOWS) {
+                String localAppData = System.getenv("LOCALAPPDATA");
+                if (localAppData == null || localAppData.isEmpty()) {
+                    throw new IllegalStateException("LOCALAPPDATA not set");
+                }
+                base = Path.of(localAppData);
+            } else {
+                throw new IllegalStateException("Unsupported OS");
             }
-            base = Path.of(localAppData);
         } else {
-            throw new IllegalStateException("Unsupported OS");
+            base = Path.of(sqlitePath);
         }
 
         Path dbDir = base.resolve("elite-vault/db");

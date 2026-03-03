@@ -131,7 +131,7 @@ public class BootstrapImporter {
             composition.setAtmosphere(atmoMap);
         }
         entry.setComposition(composition);
-
+        System.out.println(entry.getBodyName() + " " + entry.getType() + " " + entry.getSubType());
         SINGLETONS.getStellarObjectManager().save(entry);
     }
 }

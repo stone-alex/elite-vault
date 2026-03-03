@@ -12,21 +12,30 @@ import java.sql.SQLException;
 @RegisterRowMapper(MarketDao.MarketMapper.class)
 public interface MarketDao {
 
+    /**
+     * Upserts a market entry.
+     * - Inserts if marketId doesn't exist
+     * - Updates all fields if marketId already exists (latest data wins)
+     * <p>
+     * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
+     * Assumes marketId has a UNIQUE index or PRIMARY KEY.
+     */
     @SqlUpdate("""
-            INSERT OR REPLACE INTO market (marketId, timestamp, starSystem, stationName, data)
-            VALUES(:marketId, :timestamp, :starSystem, :stationName, :data)
-            ON CONFLICT(marketId) DO UPDATE SET
-            data = excluded.data,
-            timestamp = excluded.timestamp,
-            starSystem = excluded.starSystem,
-            stationName = excluded.stationName
+            INSERT INTO market (marketId, timestamp, starSystem, stationName, data)
+            VALUES (:marketId, :timestamp, :starSystem, :stationName, :data)
+            ON DUPLICATE KEY UPDATE
+                timestamp   = VALUES(timestamp),
+                starSystem  = VALUES(starSystem),
+                stationName = VALUES(stationName),
+                data        = VALUES(data)
             """)
-    void upsert(@BindBean MarketDao.Market data);
+    void upsert(@BindBean Market data);
 
 
     class MarketMapper implements RowMapper<Market> {
 
-        @Override public Market map(ResultSet rs, StatementContext ctx) throws SQLException {
+        @Override
+        public Market map(ResultSet rs, StatementContext ctx) throws SQLException {
             Market entity = new Market();
             entity.setTimestamp(rs.getString("timestamp"));
             entity.setData(rs.getString("data"));
@@ -38,11 +47,11 @@ public interface MarketDao {
     }
 
     class Market {
-        String timestamp;
-        String starSystem;
-        String stationName;
-        Long marketId;
-        String data;
+        private String timestamp;
+        private String starSystem;
+        private String stationName;
+        private Long marketId;
+        private String data;
 
         public String getTimestamp() {
             return timestamp;

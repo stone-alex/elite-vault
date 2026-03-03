@@ -12,19 +12,27 @@ import java.sql.SQLException;
 @RegisterRowMapper(StellarObjectDao.StellarObjectMapper.class)
 public interface StellarObjectDao {
 
+    /**
+     * Upserts a stellar object entry.
+     * - Inserts new row if systemAddress does not exist
+     * - Updates all fields if systemAddress already exists (latest data wins)
+     * <p>
+     * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
+     * Requires UNIQUE or PRIMARY KEY on systemAddress (already present in schema).
+     */
     @SqlUpdate("""
-            INSERT OR REPLACE INTO stellar_object (starSystem, bodyId, timestamp, systemAddress, x,y,z, data)
-            VALUES(:starSystem, :bodyId, :timestamp, :systemAddress, :x, :y, :z, :data)
-            ON CONFLICT(systemAddress) DO UPDATE SET
-            data = excluded.data,
-            starSystem = excluded.starSystem,
-            timestamp = excluded.timestamp,
-            x = excluded.x,
-            y = excluded.y,
-            z = excluded.z
+            INSERT INTO stellar_object (starSystem, bodyId, timestamp, systemAddress, x, y, z, data)
+            VALUES (:starSystem, :bodyId, :timestamp, :systemAddress, :x, :y, :z, :data)
+            ON DUPLICATE KEY UPDATE
+                starSystem  = VALUES(starSystem),
+                bodyId      = VALUES(bodyId),
+                timestamp   = VALUES(timestamp),
+                x           = VALUES(x),
+                y           = VALUES(y),
+                z           = VALUES(z),
+                data        = VALUES(data)
             """)
-    void upsert(@BindBean StellarObjectDao.StellarObject data);
-
+    void upsert(@BindBean StellarObject data);
 
 
     class StellarObjectMapper implements RowMapper<StellarObject> {
@@ -45,12 +53,12 @@ public interface StellarObjectDao {
 
 
     class StellarObject {
-        String timestamp;
-        String starSystem;
-        Long systemAddress;
-        Integer bodyId;
-        double x, y, z;
-        String data;
+        private String timestamp;
+        private String starSystem;
+        private Long systemAddress;
+        private Integer bodyId;
+        private double x, y, z;
+        private String data;
 
         public String getTimestamp() {
             return timestamp;
@@ -108,7 +116,7 @@ public interface StellarObjectDao {
             this.data = data;
         }
 
-        public int getBodyId() {
+        public Integer getBodyId() {
             return bodyId;
         }
 

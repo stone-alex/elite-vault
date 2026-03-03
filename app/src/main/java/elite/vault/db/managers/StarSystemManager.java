@@ -4,6 +4,7 @@ import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.ScanDto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class StarSystemManager {
@@ -28,17 +29,42 @@ public class StarSystemManager {
         SystemDao.StarSystem entity = new SystemDao.StarSystem();
         entity.setSystemAddress(data.getSystemAddress());
         entity.setStarName(data.getStarSystem());
-        entity.setX(data.getStarPos().get(0));
-        entity.setY(data.getStarPos().get(1));
-        entity.setZ(data.getStarPos().get(2));
+        Double x = data.getStarPos().get(0);
+        Double y = data.getStarPos().get(1);
+        Double z = data.getStarPos().get(2);
+        entity.setX(x);
+        entity.setY(y);
+        entity.setZ(z);
+        int sx = (int) Math.floor((x + 40000.0) / 1000.0);
+        int sy = (int) Math.floor((y + 4000.0) / 1000.0);
+        int sz = (int) Math.floor((z + 40000.0) / 1000.0);
+        String sector = String.format("%d_%d_%d", sx, sy, sz);
+        entity.setSector(sector);
         return entity;
+    }
+
+    private List<String> getAdjacentSectors(String currentSector) {
+        String[] parts = currentSector.split("_");
+        int sx = Integer.parseInt(parts[0]);
+        int sy = Integer.parseInt(parts[1]);
+        int sz = Integer.parseInt(parts[2]);
+
+        List<String> sectors = new ArrayList<>();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    sectors.add(String.format("%d_%d_%d", sx + dx, sy + dy, sz + dz));
+                }
+            }
+        }
+        return sectors;
     }
 
     public SystemDao.StarSystem findByName(String starName) {
         return Database.withDao(SystemDao.class, dao -> dao.findByName(starName));
     }
 
-    public List<SystemDao.StarSystem> findNeighbors(double v, double v1, double v2, double v3, double v4, double v5, double x, double y, double z, String currName) {
-        return Database.withDao(SystemDao.class, dao -> dao.findNeighbors(v, v1, v2, v3, v4, v5, x, y, z, currName));
+    public List<SystemDao.StarSystem> findNeighbors(double v, double v1, double v2, double v3, double v4, double v5, double x, double y, double z, String currName, String currSector) {
+        return Database.withDao(SystemDao.class, dao -> dao.findNeighbors(v, v1, v2, v3, v4, v5, x, y, z, currName, getAdjacentSectors(currSector)));
     }
 }

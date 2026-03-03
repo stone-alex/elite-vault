@@ -5,6 +5,7 @@ import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindList;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -15,50 +16,64 @@ import java.util.List;
 @RegisterRowMapper(SystemDao.SystemMapper.class)
 public interface SystemDao {
 
-
+    /**
+     * Upserts a star system entry.
+     * - Inserts if systemAddress does not exist
+     * - Updates coordinates, name and sector if systemAddress already exists
+     * (latest data wins — typical for EDDN journal entries)
+     * <p>
+     * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
+     * Requires PRIMARY KEY or UNIQUE constraint on systemAddress (already present).
+     */
     @SqlUpdate("""
-            INSERT OR REPLACE INTO system (systemAddress, starName, x,y,z)
-            VALUES(:systemAddress, :starName, :x, :y, :z)
-            ON CONFLICT(systemAddress) DO UPDATE SET
-            starName = excluded.starName,
-            x = excluded.x,
-            y = excluded.y,
-            z = excluded.z
+            INSERT INTO star_system (systemAddress, starName, x, y, z, sector)
+            VALUES (:systemAddress, :starName, :x, :y, :z, :sector)
+            ON DUPLICATE KEY UPDATE
+                starName = VALUES(starName),
+                x        = VALUES(x),
+                y        = VALUES(y),
+                z        = VALUES(z),
+                sector   = VALUES(sector)
             """)
-    void upsert(@BindBean SystemDao.StarSystem data);
+    void upsert(@BindBean StarSystem data);
 
 
     @SqlQuery("""
             SELECT *
-                FROM system
-                WHERE starName = :starName
-            LIMIT 1;
+            FROM star_system
+            WHERE starName = :starName
+            LIMIT 1
             """)
-    SystemDao.StarSystem findByName(String starName);
+    StarSystem findByName(@Bind("starName") String starName);
 
 
     @SqlQuery("""
             SELECT *
             FROM system
             WHERE
-              starName != :currentName
+              sector IN (<sectors>)
+              AND starName != :currentName
               AND x BETWEEN :minX AND :maxX
               AND y BETWEEN :minY AND :maxY
               AND z BETWEEN :minZ AND :maxZ
               AND (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) <= 250000.0
+            ORDER BY (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz)
+            LIMIT 300
             """)
-    List<SystemDao.StarSystem> findNeighbors(
+    List<StarSystem> findNeighbors(
             @Bind("minX") double minX, @Bind("maxX") double maxX,
             @Bind("minY") double minY, @Bind("maxY") double maxY,
             @Bind("minZ") double minZ, @Bind("maxZ") double maxZ,
             @Bind("cx") double cx, @Bind("cy") double cy, @Bind("cz") double cz,
-            @Bind("currentName") String currentName
+            @Bind("currentName") String currentName,
+            @BindList(value = "sectors", onEmpty = BindList.EmptyHandling.NULL_STRING) List<String> sectors
     );
 
 
     class SystemMapper implements RowMapper<StarSystem> {
 
-        @Override public StarSystem map(ResultSet rs, StatementContext ctx) throws SQLException {
+        @Override
+        public StarSystem map(ResultSet rs, StatementContext ctx) throws SQLException {
             StarSystem entity = new StarSystem();
             entity.setDate(rs.getString("date"));
             entity.setSystemAddress(rs.getLong("systemAddress"));
@@ -66,17 +81,18 @@ public interface SystemDao {
             entity.setX(rs.getDouble("x"));
             entity.setY(rs.getDouble("y"));
             entity.setZ(rs.getDouble("z"));
+            entity.setSector(rs.getString("sector"));
             return entity;
         }
     }
 
 
     class StarSystem {
-        long systemAddress;
-        String starName;
-        double x, y, z;
-        String date;
-
+        private long systemAddress;
+        private String starName;
+        private double x, y, z;
+        private String date;
+        private String sector;
 
         public long getSystemAddress() {
             return systemAddress;
@@ -124,6 +140,14 @@ public interface SystemDao {
 
         public void setDate(String date) {
             this.date = date;
+        }
+
+        public String getSector() {
+            return sector;
+        }
+
+        public void setSector(String sector) {
+            this.sector = sector;
         }
     }
 }

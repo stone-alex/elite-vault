@@ -26,7 +26,7 @@ subprojects {
 }
 
 application {
-    mainClass = 'elite.vault.Ingest'
+    mainClass = 'elite.vault.bootstrap.InitialImport'
 }
 
 tasks.named('build') {
