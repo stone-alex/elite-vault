@@ -3,6 +3,7 @@ package elite.vault.db.dao;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlScript;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -14,15 +15,15 @@ import java.sql.SQLException;
 public interface MarketDao {
 
     @SqlUpdate("""
-            INSERT INTO market (marketId, timestamp, starSystem, stationName, data)
-            VALUES (:marketId, :timestamp, :starSystem, :stationName, :data)
+            INSERT INTO market (marketId, timestamp, starSystem, stationName, systemAddress, data)
+            VALUES (:marketId, :timestamp, :starSystem, :stationName, :systemAddress, :data)
             ON DUPLICATE KEY UPDATE
                 timestamp   = VALUES(timestamp),
                 starSystem  = VALUES(starSystem),
                 stationName = VALUES(stationName),
                 data        = VALUES(data)
             """)
-    void upsert(@BindBean Market data);
+    void upsert(@BindBean Market data, @Bind Long systemAddress);
 
     @SqlScript("""
             delete from market_commodity where timestamp < now() - interval 3 hour;
@@ -41,6 +42,7 @@ public interface MarketDao {
             entity.setStarSystem(rs.getString("starSystem"));
             entity.setStationName(rs.getString("stationName"));
             entity.setMarketId(rs.getLong("marketId"));
+            entity.setSystemAddress(rs.getLong("systemAddress"));
             return entity;
         }
     }
@@ -49,6 +51,7 @@ public interface MarketDao {
         private String timestamp;
         private String starSystem;
         private String stationName;
+        Long systemAddress;
         private Long marketId;
         private String data;
 
@@ -90,6 +93,14 @@ public interface MarketDao {
 
         public void setData(String data) {
             this.data = data;
+        }
+
+        public Long getSystemAddress() {
+            return systemAddress;
+        }
+
+        public void setSystemAddress(Long systemAddress) {
+            this.systemAddress = systemAddress;
         }
     }
 }

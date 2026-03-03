@@ -21,14 +21,14 @@ public final class MarketManager {
         return INSTANCE;
     }
 
-    public void save(CommodityMessageDto data, long systemAddress, double x, double y, double z) {
+    public void save(CommodityMessageDto data, Long systemAddress, double x, double y, double z) {
         Database.withDao(MarketDao.class, dao -> {
             dao.prune();
             return Void.TYPE;
         });
 
         Database.withDao(MarketDao.class, dao -> {
-            dao.upsert(toEntity(data));
+            dao.upsert(toEntity(data), systemAddress);
             List<CommodityItemDto> commodities = data.getCommodities();
             saveCommodities(commodities, data.getMarketId(), systemAddress, x, y, z);
             return Void.TYPE;

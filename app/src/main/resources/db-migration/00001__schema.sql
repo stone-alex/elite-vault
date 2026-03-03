@@ -8,11 +8,12 @@ SET COLLATION_CONNECTION = 'utf8mb4_unicode_ci';
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS market (
-    marketId BIGINT PRIMARY KEY,
-    timestamp   text                                                          NOT NULL,
-    starSystem  VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    stationName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    data        MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
+    marketId      BIGINT PRIMARY KEY,
+    systemAddress BIGINT                                                        NOT NULL,
+    timestamp     text                                                          NOT NULL,
+    starSystem    VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    stationName   VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    data          MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
 ) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS star_system (
