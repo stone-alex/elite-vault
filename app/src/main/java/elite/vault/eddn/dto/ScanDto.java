@@ -120,8 +120,8 @@ public class ScanDto extends BaseDto {
     @SerializedName("Rings")
     private List<RingDto> rings;                    // array of rings (very common on gas giants & some stars)
 
-    @SerializedName("Materials")
-    private Map<String, Double> materials;          // e.g. {"Iron": 0.32, "Nickel": 0.21 ...}
+//    @SerializedName("Materials")
+//    private Map<String, Double> materials;          // e.g. {"Iron": 0.32, "Nickel": 0.21 ...}
 
     @SerializedName("StarType")
     private String starType;                        // "O", "M", "Black Hole", "Neutron", etc.
@@ -508,13 +508,13 @@ public class ScanDto extends BaseDto {
         this.rings = rings;
     }
 
-    public Map<String, Double> getMaterials() {
-        return materials;
-    }
-
-    public void setMaterials(Map<String, Double> materials) {
-        this.materials = materials;
-    }
+//    public Map<String, Double> getMaterials() {
+//        return materials;
+//    }
+//
+//    public void setMaterials(Map<String, Double> materials) {
+//        this.materials = materials;
+//    }
 
     public String getStarType() {
         return starType;

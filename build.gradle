@@ -1,7 +1,6 @@
 plugins {
     id 'java'
-    id 'application'
-    id 'com.github.johnrengelman.shadow' version '8.1.1' apply false
+    id 'com.github.johnrengelman.shadow' version '8.1.1' apply false   // ← usually apply false here
 }
 
 java {
@@ -10,25 +9,24 @@ java {
     }
 }
 
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    }
+}
+
 subprojects {
     apply plugin: 'java'
     apply plugin: 'com.github.johnrengelman.shadow'
 
-    repositories {
-        mavenCentral()
-        maven {
-            url 'https://oss.sonatype.org/content/repositories/snapshots'
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
         }
     }
 
-    sourceCompatibility = 21
-    targetCompatibility = 21
-}
-
-application {
-    mainClass = 'elite.vault.bootstrap.InitialImport'
-}
-
-tasks.named('build') {
-    dependsOn project(':app').tasks.shadowJar
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << '-parameters'
+    }
 }

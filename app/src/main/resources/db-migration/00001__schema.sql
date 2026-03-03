@@ -8,9 +8,8 @@ SET COLLATION_CONNECTION = 'utf8mb4_unicode_ci';
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS market (
-    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    marketId BIGINT PRIMARY KEY,
     timestamp   text                                                          NOT NULL,
-    marketId    BIGINT                                                        NOT NULL,
     starSystem  VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     stationName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     data        MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
