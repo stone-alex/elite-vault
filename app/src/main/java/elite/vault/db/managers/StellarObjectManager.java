@@ -128,7 +128,7 @@ public class StellarObjectManager {
                 entity.setOuterRadius(r.getOuterRadius());
                 entity.setMass(r.getMass());
                 entity.setRingType(r.getType());
-                entity.setSignals(r.getSignals().toString());
+                entity.setSignals(r.getSignals() == null ? null : r.getSignals().toString());
                 dao.upsert(entity);
                 return Void.TYPE;
             });

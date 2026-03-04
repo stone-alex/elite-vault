@@ -339,7 +339,7 @@ public class EntryDto extends BaseDto {
         }
 
         public RingSignals getSignals() {
-            return signals == null ? new RingSignals() : signals;
+            return signals == null ? null : signals;
         }
     }
 
