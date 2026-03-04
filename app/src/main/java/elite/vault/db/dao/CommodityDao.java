@@ -1,8 +1,10 @@
 package elite.vault.db.dao;
 
 
+import elite.vault.db.projections.CommodityOfferProjection;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
+import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
@@ -33,7 +35,7 @@ public interface CommodityDao {
             """)
     void upsert(@BindBean CommodityDao.Commodity data);
 
-
+    @RegisterBeanMapper(CommodityOfferProjection.class)
     @SqlQuery("""
             SELECT
                     ss.starName as starName,
@@ -47,7 +49,7 @@ public interface CommodityDao {
                 FROM market_commodity mc
                 INNER JOIN star_system ss ON ss.systemAddress = mc.systemAddress
                 INNER JOIN market      m  ON m.marketId = mc.marketId
-                WHERE mc.commodity = :commodity
+                WHERE LOWER(mc.commodity) = LOWER(:commodity)
                   AND mc.stock > 0
                   AND mc.sellPrice > 0
                   AND MBRContains(ST_Buffer(POINT(:refX, :refY), :maxLy), mc.pos)
@@ -61,17 +63,6 @@ public interface CommodityDao {
             @Bind("refX") double refX,
             @Bind("refY") double refY
     );
-    record CommodityOfferProjection(
-            String starName,
-            String stationName,
-            String commodity,
-            double sellPrice,
-            int stock,
-            double distanceLy,
-            long marketId,
-            long systemAddress
-    ) {
-    }
 
 
     class CommodityMapper implements RowMapper<Commodity> {
@@ -196,4 +187,6 @@ public interface CommodityDao {
             return String.format("POINT(%f %f)", getX(), getY());
         }
     }
+
+
 }

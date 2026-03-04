@@ -1,8 +1,6 @@
-package elite.vault.api.dto;
+package elite.vault.db.projections;
 
-import elite.vault.util.Convertable;
-
-public class CommodityDto extends Convertable {
+public class CommodityOfferProjection {
     private String starName;
     private String stationName;
     private String commodity;
@@ -76,3 +74,4 @@ public class CommodityDto extends Convertable {
         this.systemAddress = systemAddress;
     }
 }
+

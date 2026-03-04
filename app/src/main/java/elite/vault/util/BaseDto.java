@@ -2,13 +2,11 @@ package elite.vault.util;
 
 import com.google.gson.annotations.SerializedName;
 import elite.vault.json.GsonFactory;
-import elite.vault.json.ToJsonConvertible;
-import elite.vault.yaml.ToYamlConvertable;
 import elite.vault.yaml.YamlFactory;
 
 import java.time.ZonedDateTime;
 
-public class BaseDto implements ToJsonConvertible, ToYamlConvertable {
+public class BaseDto extends Convertable {
 
     @SerializedName("timestamp")
     private ZonedDateTime timestamp;

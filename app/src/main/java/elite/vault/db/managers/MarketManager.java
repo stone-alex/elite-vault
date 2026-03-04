@@ -4,6 +4,7 @@ import elite.vault.api.dto.CommodityDto;
 import elite.vault.db.dao.CommodityDao;
 import elite.vault.db.dao.MarketDao;
 import elite.vault.db.dao.SystemDao;
+import elite.vault.db.projections.CommodityOfferProjection;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
 import elite.vault.eddn.dto.CommodityItemDto;
@@ -79,17 +80,17 @@ public final class MarketManager {
         if (starSystem == null) return Collections.emptyList();
         return Database.withDao(CommodityDao.class, dao -> {
             LinkedList<CommodityDto> result = new LinkedList<>();
-            List<CommodityDao.CommodityOfferProjection> entity = dao.findBestCommodityOffers(commodity, maxDistance, starSystem.getX(), starSystem.getY());
-            for (CommodityDao.CommodityOfferProjection e : entity) {
+            List<CommodityOfferProjection> entity = dao.findBestCommodityOffers(commodity, maxDistance, starSystem.getX(), starSystem.getY());
+            for (CommodityOfferProjection e : entity) {
                 CommodityDto dto = new CommodityDto();
-                dto.setCommodity(e.commodity());
-                dto.setDistanceLy(e.distanceLy());
-                dto.setMarketId(e.marketId());
-                dto.setSellPrice(e.sellPrice());
-                dto.setStock(e.stock());
-                dto.setSystemAddress(e.systemAddress());
-                dto.setStationName(e.stationName());
-                dto.setStarName(e.starName());
+                dto.setCommodity(e.getCommodity());
+                dto.setDistanceLy(e.getDistanceLy());
+                dto.setMarketId(e.getMarketId());
+                dto.setSellPrice(e.getSellPrice());
+                dto.setStock(e.getStock());
+                dto.setSystemAddress(e.getSystemAddress());
+                dto.setStationName(e.getStationName());
+                dto.setStarName(e.getStarName());
                 result.add(dto);
             }
             return result;
