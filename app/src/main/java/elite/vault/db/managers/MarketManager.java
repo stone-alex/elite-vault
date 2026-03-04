@@ -1,12 +1,15 @@
 package elite.vault.db.managers;
 
+import elite.vault.api.dto.CommodityDto;
 import elite.vault.db.dao.CommodityDao;
 import elite.vault.db.dao.MarketDao;
+import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
 import elite.vault.eddn.dto.CommodityItemDto;
 import elite.vault.eddn.dto.CommodityMessageDto;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -71,14 +74,25 @@ public final class MarketManager {
         return entity;
     }
 
-    public List<CommodityItemDto> findCommodities(String commodity, boolean hasDemand) {
-        LinkedList<CommodityItemDto> result = new LinkedList<>();
-//        Database.withDao(MarketDao.class, dao ->{
-//            List<MarketDao.Market> entity = dao.find(commodity, hasDemand);
-//            for (MarketDao.Market e : entity) {
-//                result.add(GsonFactory.getGson().fromJson(e.getData(), CommodityItemDto.class));
-//            }
-//        });
-        return result;
+    public List<CommodityDto> findCommodities(String commodity, String startingLocationStarSystem, int maxDistance) {
+        final SystemDao.StarSystem starSystem = Database.withDao(SystemDao.class, dao -> dao.findByName(startingLocationStarSystem));
+        if (starSystem == null) return Collections.emptyList();
+        return Database.withDao(CommodityDao.class, dao -> {
+            LinkedList<CommodityDto> result = new LinkedList<>();
+            List<CommodityDao.CommodityOfferProjection> entity = dao.findBestCommodityOffers(commodity, maxDistance, starSystem.getX(), starSystem.getY());
+            for (CommodityDao.CommodityOfferProjection e : entity) {
+                CommodityDto dto = new CommodityDto();
+                dto.setCommodity(e.commodity());
+                dto.setDistanceLy(e.distanceLy());
+                dto.setMarketId(e.marketId());
+                dto.setSellPrice(e.sellPrice());
+                dto.setStock(e.stock());
+                dto.setSystemAddress(e.systemAddress());
+                dto.setStationName(e.stationName());
+                dto.setStarName(e.starName());
+                result.add(dto);
+            }
+            return result;
+        });
     }
 }

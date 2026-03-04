@@ -26,14 +26,15 @@ public interface SystemDao {
      * Requires PRIMARY KEY or UNIQUE constraint on systemAddress (already present).
      */
     @SqlUpdate("""
-            INSERT INTO star_system (systemAddress, starName, x, y, z, sector)
-            VALUES (:systemAddress, :starName, :x, :y, :z, :sector)
+            INSERT INTO star_system (systemAddress, starName, x, y, z, sector, pos)
+            VALUES (:systemAddress, :starName, :x, :y, :z, :sector, ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')')))
             ON DUPLICATE KEY UPDATE
                 starName = VALUES(starName),
                 x        = VALUES(x),
                 y        = VALUES(y),
                 z        = VALUES(z),
-                sector   = VALUES(sector)
+                sector   = VALUES(sector),
+                pos      = ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')'))
             """)
     void upsert(@BindBean StarSystem data);
 
@@ -148,6 +149,10 @@ public interface SystemDao {
 
         public void setSector(String sector) {
             this.sector = sector;
+        }
+
+        public String getPosWkt() {
+            return String.format("POINT(%f %f)", getX(), getY());
         }
     }
 }

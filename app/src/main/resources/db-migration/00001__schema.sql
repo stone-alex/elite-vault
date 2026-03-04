@@ -124,4 +124,33 @@ create table if not exists stations (
     UNIQUE KEY uk_stations_system_stationId(systemAddress, stationId)
 );
 create index if not exists idx_stations_system_address on stations(systemAddress);
--- alter table stellar_object drop column data;
+
+-- improvements for speed
+
+-- // stars
+ALTER TABLE star_system
+ADD COLUMN IF NOT EXISTS pos POINT AFTER z;
+UPDATE star_system
+SET pos = ST_GeomFromText(CONCAT('POINT(', x, ' ', y, ')'))
+WHERE pos IS NULL;
+ALTER TABLE star_system
+MODIFY COLUMN pos POINT NOT NULL;
+ALTER TABLE star_system
+ADD SPATIAL INDEX IF NOT EXISTS idx_pos_spatial(pos);
+
+-- // market commodity
+ALTER TABLE market_commodity
+ADD COLUMN IF NOT EXISTS pos POINT AFTER z;
+UPDATE market_commodity
+SET pos = ST_GeomFromText(CONCAT('POINT(', x, ' ', y, ')'))
+WHERE pos IS NULL;
+UPDATE market_commodity
+SET pos = ST_GeomFromText(CONCAT('POINT(', x, ' ', y, ')'))
+WHERE pos IS NULL AND id >= @start AND id < @start + 500000
+LIMIT 500000;
+ALTER TABLE market_commodity
+MODIFY COLUMN pos POINT NOT NULL;
+ALTER TABLE market_commodity
+ADD SPATIAL INDEX IF NOT EXISTS idx_mc_pos(pos);
+
+

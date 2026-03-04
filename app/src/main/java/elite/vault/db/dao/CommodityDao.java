@@ -4,18 +4,21 @@ package elite.vault.db.dao;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 
 @RegisterRowMapper(CommodityDao.CommodityMapper.class)
 public interface CommodityDao {
 
     @SqlUpdate("""
-            INSERT INTO market_commodity (marketId,commodity, buyPrice, sellPrice, stock, demand, systemAddress, x, y, z, timestamp)
-            VALUES (:marketId, :commodity, :buyPrice, :sellPrice, :stock, :demand, :systemAddress, :x, :y, :z, :timestamp)
+            INSERT INTO market_commodity (marketId,commodity, buyPrice, sellPrice, stock, demand, systemAddress, x, y, z, timestamp, pos)
+            VALUES (:marketId, :commodity, :buyPrice, :sellPrice, :stock, :demand, :systemAddress, :x, :y, :z, :timestamp, ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')')))
             ON DUPLICATE KEY UPDATE
                 commodity = VALUES(commodity),
                 buyPrice  = VALUES(buyPrice),
@@ -25,9 +28,50 @@ public interface CommodityDao {
                 timestamp = VALUES(timestamp),
                 x = VALUES(x),
                 y = VALUES(y),
-                z = VALUES(z)
+                z = VALUES(z),
+                pos = ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')'))
             """)
     void upsert(@BindBean CommodityDao.Commodity data);
+
+
+    @SqlQuery("""
+            SELECT
+                    ss.starName as starName,
+                    m.stationName as stationName,
+                    mc.commodity as commodity,
+                    mc.sellPrice as sellPrice,
+                    mc.stock as stock,
+                    ROUND(ST_Distance(POINT(:refX, :refY), mc.pos), 1) AS distanceLy,
+                    mc.marketId as marketId,
+                    mc.systemAddress as systemAddress
+                FROM market_commodity mc
+                INNER JOIN star_system ss ON ss.systemAddress = mc.systemAddress
+                INNER JOIN market      m  ON m.marketId = mc.marketId
+                WHERE mc.commodity = :commodity
+                  AND mc.stock > 0
+                  AND mc.sellPrice > 0
+                  AND MBRContains(ST_Buffer(POINT(:refX, :refY), :maxLy), mc.pos)
+                  AND ST_Distance(POINT(:refX, :refY), mc.pos) <= :maxLy
+                ORDER BY mc.sellPrice DESC, mc.stock DESC
+                LIMIT 20
+            """)
+    List<CommodityOfferProjection> findBestCommodityOffers(
+            @Bind("commodity") String commodity,
+            @Bind("maxLy") double maxLy,
+            @Bind("refX") double refX,
+            @Bind("refY") double refY
+    );
+    record CommodityOfferProjection(
+            String starName,
+            String stationName,
+            String commodity,
+            double sellPrice,
+            int stock,
+            double distanceLy,
+            long marketId,
+            long systemAddress
+    ) {
+    }
 
 
     class CommodityMapper implements RowMapper<Commodity> {
@@ -146,6 +190,10 @@ public interface CommodityDao {
 
         public void setTimestamp(String timestamp) {
             this.timestamp = timestamp;
+        }
+
+        public String getPosWkt() {
+            return String.format("POINT(%f %f)", getX(), getY());
         }
     }
 }

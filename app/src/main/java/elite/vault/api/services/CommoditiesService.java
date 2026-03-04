@@ -4,9 +4,8 @@ import elite.vault.eddn.dto.CommodityItemDto;
 import io.javalin.http.Context;
 import io.javalin.openapi.*;
 
-import java.util.List;
-
 import static elite.vault.Singletons.SINGLETONS;
+import static elite.vault.util.NumUtils.getIntSafely;
 
 public class CommoditiesService {
 
@@ -19,7 +18,8 @@ public class CommoditiesService {
             methods = {HttpMethod.GET},
             queryParams = {
                     @OpenApiParam(name = "commodity", description = "Commodity name (e.g. Painite)"),
-                    @OpenApiParam(name = "hasDemand", type = Boolean.class, description = "Only entries with demand > 0")
+                    @OpenApiParam(name = "startingLocationStarSystem", description = "Starting location star system name (e.g. Sol)"),
+                    @OpenApiParam(name = "maxDistance", type = Integer.class, description = "Range in light years from the starting point")
             },
             responses = {
                     @OpenApiResponse(status = "200", content = {@OpenApiContent(from = CommodityItemDto[].class)}),
@@ -28,10 +28,9 @@ public class CommoditiesService {
     )
     public static void searchCommodities(Context ctx) {
         String commodity = ctx.queryParam("commodity");
-        boolean hasDemand = "true".equals(ctx.queryParam("hasDemand"));
-
-        // Call your manager (add method if needed)
-        List<CommodityItemDto> results = SINGLETONS.getMarketManager().findCommodities(commodity, hasDemand);
-        ctx.json(results);
+        String startingLocationStarSystem = ctx.queryParam("startingLocationStarSystem");
+        int maxDistance = getIntSafely(ctx.queryParam("maxDistance"));
+        if (maxDistance == 0) maxDistance = 50; // default fallback
+        ctx.json(SINGLETONS.getMarketManager().findCommodities(commodity, startingLocationStarSystem, maxDistance));
     }
 }
