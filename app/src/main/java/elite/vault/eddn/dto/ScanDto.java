@@ -31,7 +31,7 @@ public class ScanDto extends BaseDto {
     private Double axialTilt;
 
     @SerializedName("BodyID")
-    private Integer bodyId;
+    private Long bodyId;
 
     @SerializedName("BodyName")
     private String bodyName;
@@ -120,8 +120,8 @@ public class ScanDto extends BaseDto {
     @SerializedName("Rings")
     private List<RingDto> rings;                    // array of rings (very common on gas giants & some stars)
 
-//    @SerializedName("Materials")
-//    private Map<String, Double> materials;          // e.g. {"Iron": 0.32, "Nickel": 0.21 ...}
+    @SerializedName("Materials")
+    private List<Material> materials;
 
     @SerializedName("StarType")
     private String starType;                        // "O", "M", "Black Hole", "Neutron", etc.
@@ -206,6 +206,30 @@ public class ScanDto extends BaseDto {
         }
     }
 
+    public static class Material {
+        @SerializedName("Name")
+        private String name;
+
+        @SerializedName("Percent")
+        private Double percent;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Double getPercent() {
+            return percent;
+        }
+
+        public void setPercent(Double percent) {
+            this.percent = percent;
+        }
+    }
+
     public static class SignalDto {
         @SerializedName("Type") private String type;   // "Biological", "Geological", etc.
         @SerializedName("Count") private Integer count;
@@ -267,11 +291,11 @@ public class ScanDto extends BaseDto {
         this.axialTilt = axialTilt;
     }
 
-    public Integer getBodyId() {
+    public Long getBodyId() {
         return bodyId;
     }
 
-    public void setBodyId(Integer bodyId) {
+    public void setBodyId(Long bodyId) {
         this.bodyId = bodyId;
     }
 
@@ -610,5 +634,13 @@ public class ScanDto extends BaseDto {
 
     public void setSubType(String subType) {
         this.subType = subType;
+    }
+
+    public List<Material> getMaterials() {
+        return materials;
+    }
+
+    public void setMaterials(List<Material> materials) {
+        this.materials = materials;
     }
 }

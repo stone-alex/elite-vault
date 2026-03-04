@@ -76,3 +76,17 @@ create index if not exists idx_market_commodity_system_address on market_commodi
 create index if not exists idx_market_commodity_x on market_commodity(x);
 create index if not exists idx_market_commodity_y on market_commodity(y);
 create index if not exists idx_market_commodity_z on market_commodity(z);
+
+
+
+create table if not exists materials (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress bigint not null,
+    bodyId        bigint not null,
+    bodyName      text   not null,
+    materialName  text   not null,
+    percent       double not null,
+    UNIQUE KEY uk_materials_system_body(systemAddress, bodyId)
+);
+
+create index if not exists idx_material_system_address on materials(systemAddress);

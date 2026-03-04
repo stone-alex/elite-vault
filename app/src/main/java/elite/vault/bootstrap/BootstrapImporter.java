@@ -96,7 +96,7 @@ public class BootstrapImporter {
         entry.setStarSystem(sysName);
         entry.setSystemAddress(sysAddr);
         entry.setStarPos(List.of(x, y, z));
-        entry.setBodyId(body.path("bodyId").asInt(0));
+        entry.setBodyId(body.path("bodyId").asLong(0));
         entry.setBodyName(body.path("name").asText(null));
         entry.setDistanceFromArrivalLs(distanceToArrival);
         entry.setMassEm(body.path("earthMasses").asDouble(0));

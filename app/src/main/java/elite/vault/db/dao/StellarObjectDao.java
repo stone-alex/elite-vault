@@ -42,7 +42,7 @@ public interface StellarObjectDao {
             entity.setTimestamp(rs.getString("timestamp"));
             entity.setStarSystem(rs.getString("starSystem"));
             entity.setSystemAddress(rs.getLong("systemAddress"));
-            entity.setBodyId(rs.getInt("bodyId"));
+            entity.setBodyId(rs.getLong("bodyId"));
             entity.setX(rs.getDouble("x"));
             entity.setY(rs.getDouble("y"));
             entity.setZ(rs.getDouble("z"));
@@ -56,7 +56,7 @@ public interface StellarObjectDao {
         private String timestamp;
         private String starSystem;
         private Long systemAddress;
-        private Integer bodyId;
+        private Long bodyId;
         private double x, y, z;
         private String data;
 
@@ -116,11 +116,11 @@ public interface StellarObjectDao {
             this.data = data;
         }
 
-        public Integer getBodyId() {
+        public Long getBodyId() {
             return bodyId;
         }
 
-        public void setBodyId(Integer bodyId) {
+        public void setBodyId(Long bodyId) {
             this.bodyId = bodyId;
         }
     }
