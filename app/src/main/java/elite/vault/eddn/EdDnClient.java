@@ -60,7 +60,6 @@ public class EdDnClient {
                 if (messageNode.isMissingNode()) return;
 
                 EddnDto data = GsonFactory.getGson().fromJson(messageNode.toPrettyString(), EddnDto.class);
-                System.out.print(".");
                 EventBusManager.publish(new EddnMessageEvent(schemaRefNode.asText(), data, jsonNode.path("header")));
 
             } catch (Exception e) {
