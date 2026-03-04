@@ -5,7 +5,7 @@ import elite.vault.util.BaseDto;
 
 import java.util.List;
 
-public class CommodityMessageDto extends BaseDto {
+public class EDDN_CommodityMessageDto extends BaseDto {
 
     @SerializedName("systemName")
     private String systemName;
@@ -23,13 +23,13 @@ public class CommodityMessageDto extends BaseDto {
     private String carrierDockingAccess;
 
     @SerializedName("economies")
-    private List<EconomyDto> economies;
+    private List<EDDN_EconomyDto> economies;
 
     @SerializedName("prohibited")
     private List<String> prohibited;
 
     @SerializedName("commodities")
-    private List<CommodityItemDto> commodities;
+    private List<EDDN_CommodityItemDto> commodities;
 
     // getters + setters – update names to match Java convention
     public String getSystemName() {
@@ -64,11 +64,11 @@ public class CommodityMessageDto extends BaseDto {
         this.stationType = stationType;
     }
 
-    public List<EconomyDto> getEconomies() {
+    public List<EDDN_EconomyDto> getEconomies() {
         return economies;
     }
 
-    public void setEconomies(List<EconomyDto> economies) {
+    public void setEconomies(List<EDDN_EconomyDto> economies) {
         this.economies = economies;
     }
 
@@ -80,11 +80,11 @@ public class CommodityMessageDto extends BaseDto {
         this.prohibited = prohibited;
     }
 
-    public List<CommodityItemDto> getCommodities() {
+    public List<EDDN_CommodityItemDto> getCommodities() {
         return commodities;
     }
 
-    public void setCommodities(List<CommodityItemDto> commodities) {
+    public void setCommodities(List<EDDN_CommodityItemDto> commodities) {
         this.commodities = commodities;
     }
 

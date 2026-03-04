@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 
 import java.time.ZonedDateTime;
 
-public class HeaderDto {
+public class EDDN_HeaderDto {
 
     @SerializedName("gamebuild")
     private String gamebuild;

@@ -2,14 +2,14 @@ package elite.vault.eddn.dto;
 
 import com.google.gson.annotations.SerializedName;
 
-public class EconomyDto {
+public class EDDN_EconomyDto {
+    @SerializedName("Name")
+    private String name;          // "$economy_Industrial;", etc.
 
-    @SerializedName("name")
-    private String name;
+    @SerializedName("Proportion")
+    private Double proportion;    // 0.0 to 1.0
 
-    @SerializedName("proportion")
-    private Double proportion;
-
+    // getters + setters
     public String getName() {
         return name;
     }

@@ -3,7 +3,7 @@ package elite.vault.db.managers;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
-import elite.vault.eddn.dto.ScanDto;
+import elite.vault.eddn.dto.EddnDto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,14 +19,14 @@ public class StarSystemManager {
         return INSTANCE;
     }
 
-    public void save(ScanDto data) {
+    public void save(EddnDto data) {
         Database.withDao(SystemDao.class, dao -> {
             dao.upsert(toEntity(data));
             return Void.TYPE;
         });
     }
 
-    private SystemDao.StarSystem toEntity(ScanDto data) {
+    private SystemDao.StarSystem toEntity(EddnDto data) {
         SystemDao.StarSystem entity = new SystemDao.StarSystem();
         entity.setSystemAddress(data.getSystemAddress());
         entity.setStarName(data.getStarSystem());

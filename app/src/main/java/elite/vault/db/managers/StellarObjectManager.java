@@ -1,13 +1,14 @@
 package elite.vault.db.managers;
 
-import elite.vault.bootstrap.EntryDto;
+import elite.vault.bootstrap.BootstrapEntryDto;
 import elite.vault.db.dao.MaterialsDao;
 import elite.vault.db.dao.RingsDao;
 import elite.vault.db.dao.StationsDao;
 import elite.vault.db.dao.StellarObjectDao;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
-import elite.vault.eddn.dto.ScanDto;
+import elite.vault.eddn.dto.EDDN_MaterialDto;
+import elite.vault.eddn.dto.EddnDto;
 
 import java.util.List;
 
@@ -22,7 +23,7 @@ public class StellarObjectManager {
         return INSTANCE;
     }
 
-    public void save(ScanDto data) {
+    public void save(EddnDto data) {
         saveMaterials(data.getMaterials(), data.getSystemAddress(), data.getBodyId(), data.getBodyName());
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(data));
@@ -31,9 +32,9 @@ public class StellarObjectManager {
 
     }
 
-    private void saveMaterials(List<ScanDto.Material> materials, Long systemAddress, Long bodyId, String bodyName) {
+    private void saveMaterials(List<EDDN_MaterialDto> materials, Long systemAddress, Long bodyId, String bodyName) {
         if (materials == null || materials.isEmpty()) return;
-        for (ScanDto.Material m : materials) {
+        for (EDDN_MaterialDto m : materials) {
             Database.withDao(MaterialsDao.class, dao -> {
                 MaterialsDao.Material entity = new MaterialsDao.Material();
                 entity.setBodyId(bodyId);
@@ -48,7 +49,7 @@ public class StellarObjectManager {
         }
     }
 
-    private StellarObjectDao.StellarObject toEntity(ScanDto dto) {
+    private StellarObjectDao.StellarObject toEntity(EddnDto dto) {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
@@ -60,7 +61,7 @@ public class StellarObjectManager {
         return data;
     }
 
-    private StellarObjectDao.StellarObject toEntity(EntryDto dto, double x, double y, double z) {
+    private StellarObjectDao.StellarObject toEntity(BootstrapEntryDto dto, double x, double y, double z) {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
@@ -72,7 +73,7 @@ public class StellarObjectManager {
         return data;
     }
 
-    public void saveBootStrapData(EntryDto entry, String sysName, long sysAddr, double x, double y, double z) {
+    public void saveBootStrapData(BootstrapEntryDto entry, String sysName, long sysAddr, double x, double y, double z) {
 
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(entry, x, y, z));
@@ -80,21 +81,21 @@ public class StellarObjectManager {
         });
 
         ///
-        List<EntryDto.Ring> rings = entry.getRings();
+        List<BootstrapEntryDto.Ring> rings = entry.getRings();
         if (rings != null && !rings.isEmpty()) {
             saveRings(rings, entry.getSystemAddress(), entry.getBodyId());
         }
 
         ///
-        List<EntryDto.Station> stations = entry.getStations();
+        List<BootstrapEntryDto.Station> stations = entry.getStations();
         if (stations != null && !stations.isEmpty()) {
             saveStations(stations, entry.getSystemAddress());
         }
 
     }
 
-    private void saveStations(List<EntryDto.Station> stations, Long systemAddress) {
-        for (EntryDto.Station station : stations) {
+    private void saveStations(List<BootstrapEntryDto.Station> stations, Long systemAddress) {
+        for (BootstrapEntryDto.Station station : stations) {
             Database.withDao(StationsDao.class, dao -> {
                 StationsDao.Station entity = new StationsDao.Station();
                 entity.setStationId(station.getId());
@@ -118,8 +119,8 @@ public class StellarObjectManager {
         }
     }
 
-    private void saveRings(List<EntryDto.Ring> rings, long sysAddr, long bodyId) {
-        for (EntryDto.Ring r : rings) {
+    private void saveRings(List<BootstrapEntryDto.Ring> rings, long sysAddr, long bodyId) {
+        for (BootstrapEntryDto.Ring r : rings) {
             Database.withDao(RingsDao.class, dao -> {
                 RingsDao.Ring entity = new RingsDao.Ring();
                 entity.setSystemAddress(sysAddr);

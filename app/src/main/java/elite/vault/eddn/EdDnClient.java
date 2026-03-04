@@ -2,8 +2,8 @@ package elite.vault.eddn;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import elite.vault.eddn.events.EddnMessageEvent;
-import elite.vault.eddn.events.EventBusManager;
+import elite.vault.eddn.dto.EddnDto;
+import elite.vault.json.GsonFactory;
 import elite.vault.util.ZMQUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -54,14 +54,12 @@ public class EdDnClient {
             try {
                 JsonNode schemaRefNode = jsonNode.path("$schemaRef");
                 if (!schemaRefNode.isTextual()) return;
-
-                String schemaRef = schemaRefNode.asText();
                 JsonNode messageNode = jsonNode.path("message");
                 if (messageNode.isMissingNode()) return;
 
-                JsonNode headerNode = jsonNode.path("header");
-
-                EventBusManager.publish(new EddnMessageEvent(schemaRef, messageNode, headerNode));
+                EddnDto data = GsonFactory.getGson().fromJson(messageNode.toPrettyString(), EddnDto.class);
+                System.out.print(".");
+                //EventBusManager.publish(new EddnMessageEvent(schemaRefNode.asText(), data, jsonNode.path("header")));
 
             } catch (Exception e) {
                 log.error("Error processing EDDN message: {}", e.getMessage(), e);

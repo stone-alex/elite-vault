@@ -1,14 +1,14 @@
 package elite.vault.db.managers;
 
-import elite.vault.api.dto.CommodityDto;
+import elite.vault.api.dto.API_CommodityDto;
 import elite.vault.db.dao.CommodityDao;
 import elite.vault.db.dao.MarketDao;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.projections.CommodityOfferProjection;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
-import elite.vault.eddn.dto.CommodityItemDto;
-import elite.vault.eddn.dto.CommodityMessageDto;
+import elite.vault.eddn.dto.EDDN_CommodityItemDto;
+import elite.vault.eddn.dto.EddnDto;
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -25,7 +25,7 @@ public final class MarketManager {
         return INSTANCE;
     }
 
-    public void save(CommodityMessageDto data, Long systemAddress, double x, double y, double z) {
+    public void save(EddnDto data, Long systemAddress, double x, double y, double z) {
         Database.withDao(MarketDao.class, dao -> {
             dao.prune();
             return Void.TYPE;
@@ -33,14 +33,14 @@ public final class MarketManager {
 
         Database.withDao(MarketDao.class, dao -> {
             dao.upsert(toEntity(data), systemAddress);
-            List<CommodityItemDto> commodities = data.getCommodities();
+            List<EDDN_CommodityItemDto> commodities = data.getCommodities();
             saveCommodities(commodities, data.getMarketId(), systemAddress, x, y, z);
             return Void.TYPE;
         });
     }
 
-    private void saveCommodities(List<CommodityItemDto> data, long marketId, long systemAddress, double x, double y, double z) {
-        for (CommodityItemDto d : data) {
+    private void saveCommodities(List<EDDN_CommodityItemDto> data, long marketId, long systemAddress, double x, double y, double z) {
+        for (EDDN_CommodityItemDto d : data) {
             Database.withDao(CommodityDao.class, dao -> {
                 dao.upsert(toEntity(d, marketId, systemAddress, x, y, z));
                 return Void.TYPE;
@@ -48,7 +48,7 @@ public final class MarketManager {
         }
     }
 
-    private CommodityDao.Commodity toEntity(CommodityItemDto data, long marketId, long systemAddress, double x, double y, double z) {
+    private CommodityDao.Commodity toEntity(EDDN_CommodityItemDto data, long marketId, long systemAddress, double x, double y, double z) {
         CommodityDao.Commodity entity = new CommodityDao.Commodity();
         entity.setTimestamp(TimeUtil.getCurrentTimestamp());
         entity.setBuyPrice(data.getBuyPrice());
@@ -65,24 +65,24 @@ public final class MarketManager {
     }
 
 
-    private MarketDao.Market toEntity(CommodityMessageDto data) {
+    private MarketDao.Market toEntity(EddnDto data) {
         MarketDao.Market entity = new MarketDao.Market();
         entity.setTimestamp(TimeUtil.toEntityDateTime(data.getTimestamp()));
         entity.setData(data.toJson());
         entity.setMarketId(data.getMarketId());
-        entity.setStarSystem(data.getSystemName());
+        entity.setStarSystem(data.getStarSystem());
         entity.setStationName(data.getStationName());
         return entity;
     }
 
-    public List<CommodityDto> findCommodities(String commodity, String startingLocationStarSystem, int maxDistance) {
+    public List<API_CommodityDto> findCommodities(String commodity, String startingLocationStarSystem, int maxDistance) {
         final SystemDao.StarSystem starSystem = Database.withDao(SystemDao.class, dao -> dao.findByName(startingLocationStarSystem));
         if (starSystem == null) return Collections.emptyList();
         return Database.withDao(CommodityDao.class, dao -> {
-            LinkedList<CommodityDto> result = new LinkedList<>();
+            LinkedList<API_CommodityDto> result = new LinkedList<>();
             List<CommodityOfferProjection> entity = dao.findBestCommodityOffers(commodity, maxDistance, starSystem.getX(), starSystem.getY());
             for (CommodityOfferProjection e : entity) {
-                CommodityDto dto = new CommodityDto();
+                API_CommodityDto dto = new API_CommodityDto();
                 dto.setCommodity(e.getCommodity());
                 dto.setDistanceLy(e.getDistanceLy());
                 dto.setMarketId(e.getMarketId());

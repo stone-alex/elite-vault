@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 
 import java.util.List;
 
-public class CommodityItemDto {
+public class EDDN_CommodityItemDto {
     @SerializedName("name")
     private String name;
 

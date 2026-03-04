@@ -2,7 +2,7 @@ package elite.vault.api.dto;
 
 import elite.vault.util.Convertable;
 
-public class CommodityDto extends Convertable {
+public class API_CommodityDto extends Convertable {
     private String starName;
     private String stationName;
     private String commodity;

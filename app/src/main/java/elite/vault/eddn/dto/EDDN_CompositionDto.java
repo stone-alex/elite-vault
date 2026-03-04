@@ -5,7 +5,7 @@ import com.google.gson.annotations.SerializedName;
 import java.util.HashMap;
 import java.util.Map;
 
-public class CompositionDto {
+public class EDDN_CompositionDto {
 
     @SerializedName("Ice")
     private Double ice;

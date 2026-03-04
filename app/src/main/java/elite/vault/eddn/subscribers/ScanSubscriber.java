@@ -1,9 +1,8 @@
 package elite.vault.eddn.subscribers;
 
 import com.google.common.eventbus.Subscribe;
-import elite.vault.eddn.dto.ScanDto;
+import elite.vault.eddn.dto.EddnDto;
 import elite.vault.eddn.events.EddnMessageEvent;
-import elite.vault.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -19,19 +18,17 @@ public class ScanSubscriber {
         if (!event.isJournal() || !"Scan".equals(event.getEventType())) {
             return;
         }
+        if ("AutoScan".equalsIgnoreCase(event.getData().getScanType())) {
+            return;
+        }
 
-        try {
-            String json = SINGLETONS.getObjectMapper().writeValueAsString(event.messageNode());
-            ScanDto dto = GsonFactory.getGson().fromJson(json, ScanDto.class);
-            if (dto.getDistanceFromArrivalLs() == 0) {
-                SINGLETONS.getStarSystemManager().save(dto);
-                log.info("EDDM Star System " + dto.getStarSystem());
-            } else {
-                SINGLETONS.getStellarObjectManager().save(dto);
-                log.info("EDDM Stellar Object " + dto.getStarSystem());
-            }
-        } catch (Exception e) {
-            log.error("Unable to process EDEN event " + event.getEventType(), e);
+        EddnDto data = event.getData();
+        if (data.getDistanceFromArrivalLs() == 0) {
+            SINGLETONS.getStarSystemManager().save(data);
+            log.info("EDDM Star System " + data.getStarSystem());
+        } else {
+            SINGLETONS.getStellarObjectManager().save(data);
+            log.info("EDDM Stellar Object " + data.getStarSystem());
         }
     }
 }

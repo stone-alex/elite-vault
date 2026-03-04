@@ -5,7 +5,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import elite.vault.eddn.dto.ScanDto;
+import elite.vault.eddn.dto.EddnDto;
 import elite.vault.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -73,11 +73,11 @@ public class BootstrapImporter {
         double z = coords.path("z").asDouble(0);
 
         // Upsert core system (even if no bodies)
-        ScanDto scanDto = new ScanDto();
-        scanDto.setSystemAddress(sysAddr);
-        scanDto.setStarSystem(name);
-        scanDto.setStarPos(List.of(x, y, z));
-        SINGLETONS.getStarSystemManager().save(scanDto);
+        EddnDto eddnDto = new EddnDto();
+        eddnDto.setSystemAddress(sysAddr);
+        eddnDto.setStarSystem(name);
+        eddnDto.setStarPos(List.of(x, y, z));
+        SINGLETONS.getStarSystemManager().save(eddnDto);
         log.info("Saved " + name);
 
         upsertedSystems++;
@@ -91,7 +91,7 @@ public class BootstrapImporter {
     }
 
     private void saveBodyAsStellarObject(JsonNode body, String sysName, long sysAddr, double x, double y, double z) {
-        EntryDto entry = GsonFactory.getGson().fromJson(body.toPrettyString(), EntryDto.class);
+        BootstrapEntryDto entry = GsonFactory.getGson().fromJson(body.toPrettyString(), BootstrapEntryDto.class);
         if ("Barycentre".equalsIgnoreCase(entry.getBodyType())) {
             //skip
         } else if ("Star".equalsIgnoreCase(entry.getBodyType())) {
