@@ -15,20 +15,15 @@ public class ScanSubscriber {
     @Subscribe
     public void onEvent(EddnMessageEvent event) {
 
-        if (!event.isJournal() || !"Scan".equals(event.getEventType())) {
-            return;
-        }
-        if ("AutoScan".equalsIgnoreCase(event.getData().getScanType())) {
-            return;
-        }
-
         EddnDto data = event.getData();
-        if (data.getDistanceFromArrivalLs() == 0) {
-            SINGLETONS.getStarSystemManager().save(data);
-            log.info("EDDM Star System " + data.getStarSystem());
-        } else {
-            SINGLETONS.getStellarObjectManager().save(data);
-            log.info("EDDM Stellar Object " + data.getStarSystem());
+        if (event.isJournal() || "Scan".equals(event.getEventType())) {
+            if (data.getDistanceFromArrivalLs() == null || data.getDistanceFromArrivalLs() == 0) {
+                SINGLETONS.getStarSystemManager().save(data);
+                log.info("\nEDDM Star System " + data.getStarSystem());
+            } else {
+                SINGLETONS.getStellarObjectManager().save(data);
+                log.info("\nEDDM Stellar Object " + data.getStarSystem());
+            }
         }
     }
 }

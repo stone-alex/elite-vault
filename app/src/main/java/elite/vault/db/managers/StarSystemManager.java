@@ -1,8 +1,11 @@
 package elite.vault.db.managers;
 
+import elite.vault.db.dao.FactionsDao;
+import elite.vault.db.dao.PowerPlayStateDao;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
+import elite.vault.eddn.dto.EDDN_FactionDto;
 import elite.vault.eddn.dto.EddnDto;
 
 import java.util.ArrayList;
@@ -89,6 +92,58 @@ public class StarSystemManager {
         int sz = (int) Math.floor((z + 40000.0) / 1000.0);
         String sector = String.format("%d_%d_%d", sx, sy, sz);
         entity.setSector(sector);
+        return entity;
+    }
+
+    public void saveFsdJump(EddnDto data) {
+        if (data.getSystemAllegiance() == null) return;
+
+        Database.withDao(PowerPlayStateDao.class, dao -> {
+            dao.upsert(toPowerPlayEntity(data), data.getSystemAddress());
+            return Void.TYPE;
+        });
+
+        List<EDDN_FactionDto> factions = data.getFactions();
+        if (factions == null) return;
+        for (EDDN_FactionDto faction : factions) {
+            if (faction == null) continue;
+            if (faction.getAllegiance() == null) continue;
+            Database.withDao(FactionsDao.class, dao -> {
+                dao.upsert(toFactions(faction, data.getSystemAddress()));
+                return Void.TYPE;
+            });
+        }
+    }
+
+    private FactionsDao.Faction toFactions(EDDN_FactionDto faction, Long systemAddress) {
+        FactionsDao.Faction entity = new FactionsDao.Faction();
+        entity.setAllegiance(faction.getAllegiance());
+        entity.setFactionName(faction.getFactionName());
+        entity.setFactionState(faction.getFactionState());
+        entity.setSystemAddress(systemAddress);
+        entity.setGovernment(faction.getGovernment());
+        entity.setHappiness(faction.getHappiness());
+        entity.setInfluence(faction.getInfluence());
+        return entity;
+    }
+
+    private PowerPlayStateDao.PowerPlayState toPowerPlayEntity(EddnDto data) {
+        PowerPlayStateDao.PowerPlayState entity = new PowerPlayStateDao.PowerPlayState();
+        entity.setSystemAllegiance(data.getSystemAllegiance());
+        entity.setControllingFaction(data.getSystemFaction() == null ? null : data.getSystemFaction().getName());
+        entity.setControllingPower(data.getControllingPower());
+        entity.setSystemEconomy(data.getSystemEconomy() == null ? null : data.getSystemEconomy().replace("$economy_", "").replace(";", ""));
+        entity.setSystemSecondEconomy(data.getSystemSecondEconomy() == null ? null : data.getSystemSecondEconomy().replace("$economy_", "").replace(";", ""));
+        entity.setSystemGovernment(data.getSystemGovernment() == null ? null : data.getSystemGovernment().replace("$government_", "").replace(";", ""));
+        entity.setSystemSecurity(
+                data.getSystemSecurity() == null ? null : data.getSystemSecurity()
+                        .replace("$GAlAXY_MAP_INFO_state_", "").replace(";", "")
+                        .replace("$SYSTEM_SECURITY_", "").replace(";", "")
+        );
+        entity.setPowerplayState(data.getPowerplayState());
+        entity.setPowerplayStateControlProgress(data.getPowerplayStateControlProgress());
+        entity.setPowerplayStateReinforcement(data.getPowerplayStateReinforcement());
+        entity.setPowerplayStateUndermining(data.getPowerplayStateUndermining());
         return entity;
     }
 }

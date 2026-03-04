@@ -154,3 +154,33 @@ ALTER TABLE market_commodity
 ADD SPATIAL INDEX IF NOT EXISTS idx_mc_pos(pos);
 
 
+-- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- //
+
+create table if not exists factions (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress bigint not null,
+    factionName   text,
+    allegiance    text,
+    government    text,
+    influence     text,
+    factionState  text,
+    happiness     text
+);
+create index if not exists idx_factions on factions(systemAddress);
+
+create table if not exists powerplay_state (
+    systemAddress                 BIGINT PRIMARY KEY,
+    systemAllegiance              text,
+    systemEconomy                 text,
+    systemSecondEconomy           text,
+    systemGovernment              text,
+    systemSecurity                text,
+    controllingFaction            text,
+    powers                        text,
+    powerplayState                text,
+    controllingPower              text,
+    powerplayStateControlProgress double,
+    powerplayStateReinforcement   integer,
+    powerplayStateUndermining     integer
+);
+create index if not exists idx_powerplay_state on powerplay_state(systemAddress);

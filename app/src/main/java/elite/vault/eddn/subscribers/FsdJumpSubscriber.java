@@ -4,17 +4,17 @@ import com.google.common.eventbus.Subscribe;
 import elite.vault.eddn.dto.EddnDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 
+import static elite.vault.Singletons.SINGLETONS;
+
 public class FsdJumpSubscriber {
 
 
     @Subscribe
     public void onEvent(EddnMessageEvent event) {
 
-        if (!"FSDJump".equalsIgnoreCase(event.getData().getScanType())) {
-            return;
+        if ("FSDJump".equalsIgnoreCase(event.getEventType())) {
+            EddnDto data = event.getData();
+            SINGLETONS.getStarSystemManager().saveFsdJump(data);
         }
-        EddnDto data = event.getData();
-        // save star system allegence, economy factions etc.
-        //SINGLETONS.getStarSystemManager().save(data);
     }
 }

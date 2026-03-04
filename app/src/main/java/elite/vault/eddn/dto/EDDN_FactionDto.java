@@ -3,19 +3,19 @@ package elite.vault.eddn.dto;
 import com.google.gson.annotations.SerializedName;
 
 public class EDDN_FactionDto {
-    @SerializedName("Name") private String name;
+    @SerializedName("Name") private String factionName;
     @SerializedName("Allegiance") private String allegiance;
     @SerializedName("Government") private String government;
     @SerializedName("Influence") private Double influence;
     @SerializedName("FactionState") private String factionState;
     @SerializedName("Happiness") private String happiness;
 
-    public String getName() {
-        return name;
+    public String getFactionName() {
+        return factionName;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setFactionName(String factionName) {
+        this.factionName = factionName;
     }
 
     public String getAllegiance() {

@@ -22,15 +22,11 @@ public class CommoditySubscriber {
         }
 
         // No need to check eventType() — it's always null here
-        try {
+        EddnDto data = event.getData();
+        SystemDao.StarSystem star = starSystemManager.findByName(data.getStarSystem());
+        if (star == null) return;
+        log.info("\nMarket update " + data.getMarketId() + " " + data.getStarSystem() + " " + data.getStationName());
+        SINGLETONS.getMarketManager().save(data, star.getSystemAddress(), star.getX(), star.getY(), star.getZ());
 
-            EddnDto data = event.getData();
-            SystemDao.StarSystem star = starSystemManager.findByName(data.getStarSystem());
-            if (star == null) return;
-            log.info("Market update " + data.getMarketId() + " " + data.getStarSystem() + " " + data.getStationName());
-            SINGLETONS.getMarketManager().save(data, star.getSystemAddress(), star.getX(), star.getY(), star.getZ());
-        } catch (Exception e) {
-            log.warn("Failed to process commodity/3 message", e);
-        }
     }
 }
