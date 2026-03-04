@@ -5,20 +5,22 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import elite.vault.eddn.dto.CompositionDto;
 import elite.vault.eddn.dto.ScanDto;
+import elite.vault.json.GsonFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static elite.vault.Singletons.SINGLETONS;
 
 public class BootstrapImporter {
+
+    private static final Logger log = LogManager.getLogger(BootstrapImporter.class);
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final JsonFactory JSON_FACTORY = new JsonFactory();
@@ -76,7 +78,7 @@ public class BootstrapImporter {
         scanDto.setStarSystem(name);
         scanDto.setStarPos(List.of(x, y, z));
         SINGLETONS.getStarSystemManager().save(scanDto);
-        System.out.println("Saved " + name);
+        log.info("Saved " + name);
 
         upsertedSystems++;
 
@@ -89,49 +91,15 @@ public class BootstrapImporter {
     }
 
     private void saveBodyAsStellarObject(JsonNode body, String sysName, long sysAddr, double x, double y, double z) {
-        double distanceToArrival = body.path("distanceToArrival").asDouble(0);
-        if (distanceToArrival == 0) return; // this is the primary star.
-
-        ScanDto entry = new ScanDto();
-        entry.setStarSystem(sysName);
-        entry.setSystemAddress(sysAddr);
-        entry.setStarPos(List.of(x, y, z));
-        entry.setBodyId(body.path("bodyId").asLong(0));
-        entry.setBodyName(body.path("name").asText(null));
-        entry.setDistanceFromArrivalLs(distanceToArrival);
-        entry.setMassEm(body.path("earthMasses").asDouble(0));
-        entry.setRadius(body.path("radius").asDouble(0));
-        entry.setSurfaceTemperature(body.path("surfaceTemperature").asDouble(0));
-        entry.setSurfaceGravity(body.path("gravity").asDouble(0));
-        entry.setAtmosphere(body.path("atmosphere").asText(null));
-        entry.setType(body.path("type").asText(null));
-        entry.setSubType(body.path("subType").asText(null));
-        entry.setMainStar(body.path("mainStar").asBoolean(false));
-        entry.setLandable(body.path("isLandable").asBoolean(false));
-        entry.setOrbitalPeriod(body.path("orbitalPeriod").asDouble(0));
-        entry.setOrbitalInclination(body.path("orbitalInclination").asDouble(0));
-
-
-        CompositionDto composition = new CompositionDto();
-        JsonNode solidNode = body.path("solidComposition");
-        if (solidNode.isObject()) {
-            composition.setIce(solidNode.path("Ice").asDouble());
-            composition.setMetal(solidNode.path("Metal").asDouble());
-            composition.setRock(solidNode.path("Rock").asDouble());
+        EntryDto entry = GsonFactory.getGson().fromJson(body.toPrettyString(), EntryDto.class);
+        if ("Barycentre".equalsIgnoreCase(entry.getBodyType())) {
+            //skip
+        } else if ("Star".equalsIgnoreCase(entry.getBodyType())) {
+            SINGLETONS.getStarSystemManager().saveBootStrapData(sysName, sysAddr, x, y, z);
+        } else if ("Planet".equalsIgnoreCase(entry.getBodyType())) {
+            SINGLETONS.getStellarObjectManager().saveBootStrapData(entry, sysName, sysAddr, x, y, z);
+        } else {
+            System.out.println(entry.toJson());
         }
-
-        JsonNode atmoNode = body.path("atmosphereComposition");
-        if (atmoNode.isObject()) {
-            Map<String, Double> atmoMap = new HashMap<>();
-            atmoNode.properties().forEach(field -> {
-                String key = field.getKey();
-                Double value = field.getValue().asDouble();  // null if not number
-                atmoMap.put(key, value);
-            });
-            composition.setAtmosphere(atmoMap);
-        }
-        entry.setComposition(composition);
-        System.out.println(entry.getBodyName() + " " + entry.getType() + " " + entry.getSubType());
-        SINGLETONS.getStellarObjectManager().save(entry);
     }
 }

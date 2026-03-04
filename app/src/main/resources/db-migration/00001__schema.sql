@@ -34,8 +34,7 @@ CREATE TABLE IF NOT EXISTS stellar_object (
     systemAddress BIGINT                                                        NOT NULL,
     x             DOUBLE                                                        NOT NULL,
     y             DOUBLE                                                        NOT NULL,
-    z             DOUBLE                                                        NOT NULL,
-    data          MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci   NOT NULL
+    z DOUBLE NOT NULL
 ) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -78,6 +77,7 @@ create index if not exists idx_market_commodity_y on market_commodity(y);
 create index if not exists idx_market_commodity_z on market_commodity(z);
 
 
+-- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// -- /// --
 
 create table if not exists materials (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -88,5 +88,40 @@ create table if not exists materials (
     percent       double not null,
     UNIQUE KEY uk_materials_system_body(systemAddress, bodyId)
 );
-
 create index if not exists idx_material_system_address on materials(systemAddress);
+
+-- //
+create table if not exists rings (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress bigint not null,
+    bodyId        bigint not null,
+    ringType      text   not null,
+    mass          double not null,
+    innerRadius   double not null,
+    outerRadius   double not null,
+    signals       text,
+    UNIQUE KEY uk_rings_system_body(systemAddress, bodyId)
+);
+create index if not exists idx_rings_system_address on rings(systemAddress);
+
+-- //
+create table if not exists stations (
+    id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress           bigint  not null,
+    stationId               bigint  not null,
+    realName                text    not null,
+    controllingFaction      text,
+    controllingFactionState text,
+    distanceToArrival       double  not null,
+    primaryEconomy          text,
+    economies               text,
+    government              text,
+    services                text,
+    hasLargePad             boolean not null default 0,
+    hasMediumPad            boolean not null default 0,
+    hasSmallPad             boolean not null default 0,
+
+    UNIQUE KEY uk_stations_system_stationId(systemAddress, stationId)
+);
+create index if not exists idx_stations_system_address on stations(systemAddress);
+-- alter table stellar_object drop column data;

@@ -1,6 +1,7 @@
 package elite.vault.eddn.dto;
 
 import com.google.gson.annotations.SerializedName;
+import elite.vault.util.BaseDto;
 
 import java.util.List;
 

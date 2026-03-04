@@ -2,6 +2,7 @@ package elite.vault.db.managers;
 
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
+import elite.vault.db.util.TimeUtil;
 import elite.vault.eddn.dto.ScanDto;
 
 import java.util.ArrayList;
@@ -66,5 +67,28 @@ public class StarSystemManager {
 
     public List<SystemDao.StarSystem> findNeighbors(double v, double v1, double v2, double v3, double v4, double v5, double x, double y, double z, String currName, String currSector) {
         return Database.withDao(SystemDao.class, dao -> dao.findNeighbors(v, v1, v2, v3, v4, v5, x, y, z, currName, getAdjacentSectors(currSector)));
+    }
+
+    public void saveBootStrapData(String sysName, long sysAddr, double x, double y, double z) {
+        Database.withDao(SystemDao.class, dao -> {
+            dao.upsert(toEntity(sysName, sysAddr, x, y, z));
+            return Void.TYPE;
+        });
+    }
+
+    private SystemDao.StarSystem toEntity(String sysName, long sysAddr, double x, double y, double z) {
+        SystemDao.StarSystem entity = new SystemDao.StarSystem();
+        entity.setDate(TimeUtil.getCurrentTimestamp());
+        entity.setSystemAddress(sysAddr);
+        entity.setStarName(sysName);
+        entity.setX(x);
+        entity.setY(y);
+        entity.setZ(z);
+        int sx = (int) Math.floor((x + 40000.0) / 1000.0);
+        int sy = (int) Math.floor((y + 4000.0) / 1000.0);
+        int sz = (int) Math.floor((z + 40000.0) / 1000.0);
+        String sector = String.format("%d_%d_%d", sx, sy, sz);
+        entity.setSector(sector);
+        return entity;
     }
 }

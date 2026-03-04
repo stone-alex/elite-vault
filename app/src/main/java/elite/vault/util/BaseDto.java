@@ -1,4 +1,4 @@
-package elite.vault.eddn.dto;
+package elite.vault.util;
 
 import com.google.gson.annotations.SerializedName;
 import elite.vault.json.GsonFactory;
