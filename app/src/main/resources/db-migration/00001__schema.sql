@@ -184,3 +184,7 @@ create table if not exists powerplay_state (
     powerplayStateUndermining     integer
 );
 create index if not exists idx_powerplay_state on powerplay_state(systemAddress);
+
+
+-- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- //
+

@@ -83,18 +83,18 @@ public class StellarObjectManager {
         ///
         List<BootstrapEntryDto.Ring> rings = entry.getRings();
         if (rings != null && !rings.isEmpty()) {
-            saveRings(rings, entry.getSystemAddress(), entry.getBodyId());
+            saveBootstrapRings(rings, entry.getSystemAddress(), entry.getBodyId());
         }
 
         ///
         List<BootstrapEntryDto.Station> stations = entry.getStations();
         if (stations != null && !stations.isEmpty()) {
-            saveStations(stations, entry.getSystemAddress());
+            saveBootstrpStations(stations, entry.getSystemAddress());
         }
 
     }
 
-    private void saveStations(List<BootstrapEntryDto.Station> stations, Long systemAddress) {
+    private void saveBootstrpStations(List<BootstrapEntryDto.Station> stations, Long systemAddress) {
         for (BootstrapEntryDto.Station station : stations) {
             Database.withDao(StationsDao.class, dao -> {
                 StationsDao.Station entity = new StationsDao.Station();
@@ -119,7 +119,7 @@ public class StellarObjectManager {
         }
     }
 
-    private void saveRings(List<BootstrapEntryDto.Ring> rings, long sysAddr, long bodyId) {
+    private void saveBootstrapRings(List<BootstrapEntryDto.Ring> rings, long sysAddr, long bodyId) {
         for (BootstrapEntryDto.Ring r : rings) {
             Database.withDao(RingsDao.class, dao -> {
                 RingsDao.Ring entity = new RingsDao.Ring();

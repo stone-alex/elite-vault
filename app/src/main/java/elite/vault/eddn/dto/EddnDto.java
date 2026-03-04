@@ -268,6 +268,9 @@ public class EddnDto extends BaseDto {
     @SerializedName("commodities")
     private List<EDDN_CommodityItemDto> commodities;
 
+    public List<EDDN_FssSignalDto> getFssSignals() {
+        return fssSignals;
+    }
 
     public String getBody() {
         return body;
