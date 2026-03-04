@@ -4,7 +4,7 @@
 
 Elite Vault is a lightweight, pure-Java service that connects to the [Elite Dangerous Data Network (EDDN)](https://github.com/EDCD/EDDN)
 to ingest live game data (markets, power play, systems, discoveries, etc.)
-and stores it locally in a relational database. It provides a simple, reliable HTTP API for querying this data.
+and stores it locally in a relational database. It provides a simple, custom HTTP API for querying this data.
 
 Designed for self-hosting on Linux servers (or even modest hardware like a repurposed desktop or Synology NAS
 paired with Raspberry Pi 5), it emphasizes **data freshness** over historical archives: market prices
