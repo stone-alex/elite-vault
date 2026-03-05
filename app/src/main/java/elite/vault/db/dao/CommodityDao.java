@@ -2,6 +2,7 @@ package elite.vault.db.dao;
 
 
 import elite.vault.db.projections.CommodityOfferProjection;
+import elite.vault.db.projections.TradePairProjection;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
@@ -64,6 +65,112 @@ public interface CommodityDao {
             @Bind("refY") double refY
     );
 
+
+    @RegisterBeanMapper(TradePairProjection.class)
+    @SqlQuery("""
+            SELECT
+                ss.starName           AS buySystem,
+                m.stationName         AS buyStation,
+                mc.commodity          AS commodity,
+                MIN(mc.buyPrice)      AS buyPrice,
+                mc.stock              AS buyStock,
+                mc.marketId           AS buyMarketId,
+                mc.systemAddress      AS buySystemAddress,
+                mc.x                  AS buyX,
+                mc.y                  AS buyY,
+                st.distanceToArrival  AS buyDistToArrival,
+                ROUND(ST_Distance(POINT(:refX, :refY), mc.pos), 1) AS buyDistanceLy
+            FROM market_commodity mc
+            INNER JOIN star_system ss ON ss.systemAddress = mc.systemAddress
+            INNER JOIN market      m  ON m.marketId       = mc.marketId
+            INNER JOIN stations    st ON st.systemAddress  = mc.systemAddress AND st.stationId = mc.marketId
+            WHERE mc.buyPrice > 0
+              AND mc.stock > 0
+              AND st.distanceToArrival <= :maxDistFromEntrance
+              AND MBRContains(ST_Buffer(POINT(:refX, :refY), :jumpRange), mc.pos)
+              AND ST_Distance(POINT(:refX, :refY), mc.pos) <= :jumpRange
+            GROUP BY mc.commodity
+            ORDER BY buyPrice ASC
+            LIMIT 10
+            """)
+    List<TradePairProjection> findBuyOffers(
+            @Bind("jumpRange") double jumpRange,
+            @Bind("refX") double refX,
+            @Bind("refY") double refY,
+            @Bind("maxDistFromEntrance") double maxDistFromEntrance
+    );
+
+    /**
+     * Find the best SELL destination for a specific commodity near (refX, refY).
+     * stationId == marketId. Uses spatial index (constant point reference).
+     */
+    @RegisterBeanMapper(TradePairProjection.class)
+    @SqlQuery("""
+            SELECT
+                ss.starName           AS sellSystem,
+                m.stationName         AS sellStation,
+                mc.commodity          AS commodity,
+                mc.sellPrice          AS sellPrice,
+                mc.demand             AS sellDemand,
+                mc.marketId           AS sellMarketId,
+                mc.systemAddress      AS sellSystemAddress,
+                st.distanceToArrival  AS sellDistToArrival,
+                ROUND(ST_Distance(POINT(:refX, :refY), mc.pos), 1) AS legDistanceLy
+            FROM market_commodity mc
+            INNER JOIN star_system ss ON ss.systemAddress = mc.systemAddress
+            INNER JOIN market      m  ON m.marketId       = mc.marketId
+            INNER JOIN stations    st ON st.systemAddress  = mc.systemAddress
+                                     AND st.stationId     = mc.marketId
+            WHERE LOWER(mc.commodity) = LOWER(:commodity)
+              AND mc.sellPrice > :minSellPrice
+              AND mc.demand > 0
+              AND mc.marketId != :excludeMarketId
+              AND st.distanceToArrival <= :maxDistFromEntrance
+              AND MBRContains(ST_Buffer(POINT(:refX, :refY), :jumpRange), mc.pos)
+              AND ST_Distance(POINT(:refX, :refY), mc.pos) <= :jumpRange
+            ORDER BY mc.sellPrice DESC
+            LIMIT 1
+            """)
+    List<TradePairProjection> findBestSellFor(
+            @Bind("commodity") String commodity,
+            @Bind("minSellPrice") double minSellPrice,
+            @Bind("excludeMarketId") long excludeMarketId,
+            @Bind("jumpRange") double jumpRange,
+            @Bind("refX") double refX,
+            @Bind("refY") double refY,
+            @Bind("maxDistFromEntrance") double maxDistFromEntrance
+    );
+
+    /**
+     * Find cheapest commodities to buy AT a specific station (marketId).
+     * Used for hops 2+, where you're already at the sell destination of the previous leg.
+     */
+    @RegisterBeanMapper(TradePairProjection.class)
+    @SqlQuery("""
+            SELECT
+                ss.starName           AS buySystem,
+                m.stationName         AS buyStation,
+                mc.commodity          AS commodity,
+                mc.buyPrice           AS buyPrice,
+                mc.stock              AS buyStock,
+                mc.marketId           AS buyMarketId,
+                mc.systemAddress      AS buySystemAddress,
+                mc.x                  AS buyX,
+                mc.y                  AS buyY,
+                0                     AS buyDistToArrival,
+                0                     AS buyDistanceLy
+            FROM market_commodity mc
+            INNER JOIN star_system ss ON ss.systemAddress = mc.systemAddress
+            INNER JOIN market      m  ON m.marketId       = mc.marketId
+            WHERE mc.marketId = :marketId
+              AND mc.buyPrice > 0
+              AND mc.stock > 0
+            ORDER BY mc.buyPrice ASC
+            LIMIT 10
+            """)
+    List<TradePairProjection> findBuyOffersAtStation(
+            @Bind("marketId") long marketId
+    );
 
     class CommodityMapper implements RowMapper<Commodity> {
 

@@ -1,6 +1,6 @@
 package elite.vault.api.services;
 
-import elite.vault.eddn.dto.EDDN_CommodityItemDto;
+import elite.vault.api.dto.API_CommodityDto;
 import io.javalin.http.Context;
 import io.javalin.openapi.*;
 import org.apache.logging.log4j.LogManager;
@@ -25,7 +25,7 @@ public class CommoditiesService {
                     @OpenApiParam(name = "maxDistance", type = Integer.class, description = "Range in light years from the starting point")
             },
             responses = {
-                    @OpenApiResponse(status = "200", content = {@OpenApiContent(from = EDDN_CommodityItemDto[].class)}),
+                    @OpenApiResponse(status = "200", content = {@OpenApiContent(from = API_CommodityDto[].class)}),
                     @OpenApiResponse(status = "500", content = {@OpenApiContent(from = String.class)})
             }
     )

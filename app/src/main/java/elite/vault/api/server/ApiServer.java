@@ -2,6 +2,7 @@ package elite.vault.api.server;
 
 import elite.vault.api.services.CarrierRouteService;
 import elite.vault.api.services.CommoditiesService;
+import elite.vault.api.services.TradeRouteService;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
 import io.javalin.openapi.plugin.OpenApiPlugin;
@@ -39,6 +40,7 @@ public class ApiServer {
             config.routes.get("/api/v1/health", ctx -> ctx.result("OK"));
             config.routes.get("/api/v1/search/commodities", CommoditiesService::searchCommodities);
             config.routes.get("/api/v1/search/carrier/route", CarrierRouteService::findCarrierRoute);
+            config.routes.get("/api/v1/search/traderoute", TradeRouteService::calculateTradeRoute);
 
             /// error
             config.routes.exception(Exception.class, (e, ctx) -> {
