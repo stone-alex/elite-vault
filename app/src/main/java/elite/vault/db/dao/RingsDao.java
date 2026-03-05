@@ -4,11 +4,16 @@ package elite.vault.db.dao;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
+
+import static elite.vault.db.dao.SqlFragments.NEIGHBOR_SYSTEMS_CTE;
 
 @RegisterRowMapper(RingsDao.RingMawpper.class)
 public interface RingsDao {
@@ -24,6 +29,18 @@ public interface RingsDao {
                 signals     = VALUES(signals)
             """)
     void upsert(@BindBean RingsDao.Ring data);
+
+
+    @SqlQuery(NEIGHBOR_SYSTEMS_CTE + """
+            # noinspection SqlResolve
+            SELECT r.*
+            FROM rings r
+            JOIN neighbors n ON n.systemAddress = r.systemAddress
+            """)
+    List<Ring> findByNeighborSystem(
+            @Bind("starName") String starName,
+            @Bind("range") double range
+    );
 
 
     class RingMawpper implements RowMapper<Ring> {

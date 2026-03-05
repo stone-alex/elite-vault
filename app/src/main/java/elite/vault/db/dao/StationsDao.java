@@ -14,8 +14,8 @@ public interface StationsDao {
 
 
     @SqlUpdate("""
-            INSERT INTO stations (systemaddress, stationid, realname, controllingfaction, controllingfactionstate, distancetoarrival, primaryeconomy, economies, government, services, haslargepad, hasmediumpad, hassmallpad)
-            VALUES (:systemAddress, :stationId, :realName, :controllingFaction, :controllingFactionState, :distanceToArrival, :primaryEconomy, :economies, :government, :services, :hasLargePad, :hasMediumPad, :hasSmallPad)
+            INSERT INTO stations (systemaddress, stationid, realname, controllingfaction, controllingfactionstate, distancetoarrival, primaryeconomy, economies, government, services, haslargepad, hasmediumpad, hassmallpad, stationType)
+            VALUES (:systemAddress, :stationId, :realName, :controllingFaction, :controllingFactionState, :distanceToArrival, :primaryEconomy, :economies, :government, :services, :hasLargePad, :hasMediumPad, :hasSmallPad, :stationType)
             ON DUPLICATE KEY UPDATE
                 realName    = VALUES(realName),
                 controllingFaction        = VALUES(controllingFaction),
@@ -25,6 +25,7 @@ public interface StationsDao {
                 economies     = VALUES(economies),
                 government     = VALUES(government),
                 services     = VALUES(services),
+                stationType     = VALUES(stationType),
                 hasLargePad     = VALUES(hasLargePad),
                 hasMediumPad     = VALUES(hasMediumPad),
                 hasSmallPad     = VALUES(hasSmallPad)
@@ -47,6 +48,7 @@ public interface StationsDao {
             entity.setHasLargePad(rs.getBoolean("hasLargePad"));
             entity.setHasMediumPad(rs.getBoolean("hasMediumPad"));
             entity.setHasSmallPad(rs.getBoolean("hasSmallPad"));
+            entity.setStationType(rs.getString("stationType"));
             return entity;
         }
     }
@@ -55,6 +57,7 @@ public interface StationsDao {
         private Long systemAddress;
         private Long stationId;
         private String realName;
+        private String stationType;
         private String controllingFaction;
         private String controllingFactionState;
         private Double distanceToArrival;
@@ -168,6 +171,14 @@ public interface StationsDao {
 
         public void setHasSmallPad(Boolean hasSmallPad) {
             this.hasSmallPad = hasSmallPad;
+        }
+
+        public String getStationType() {
+            return stationType;
+        }
+
+        public void setStationType(String stationType) {
+            this.stationType = stationType;
         }
     }
 }

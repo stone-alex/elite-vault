@@ -29,6 +29,7 @@ public class StationManager {
             StationsDao.Station entity = new StationsDao.Station();
             entity.setDistanceToArrival(data.getDistFromStarLs());
             entity.setStationId(data.getMarketId());
+            entity.setStationType(data.getStationType());
             entity.setSystemAddress(data.getSystemAddress());
             entity.setControllingFaction(data.getStationFaction() == null ? null : data.getStationFaction().getName());
             entity.setControllingFactionState(data.getStationFaction() == null ? null : data.getStationFaction().getName());

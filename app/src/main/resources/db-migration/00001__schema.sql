@@ -31,10 +31,11 @@ CREATE TABLE IF NOT EXISTS stellar_object (
     bodyId        BIGINT                                                        NOT NULL DEFAULT 0,
     timestamp     text                                                          NOT NULL,
     starSystem    VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    bodyName VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     systemAddress BIGINT                                                        NOT NULL,
     x             DOUBLE                                                        NOT NULL,
     y             DOUBLE                                                        NOT NULL,
-    z DOUBLE NOT NULL
+    z        DOUBLE NOT NULL
 ) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -117,6 +118,7 @@ create table if not exists stations (
     economies               text,
     government              text,
     services                text,
+    stationType text,
     hasLargePad             boolean not null default 0,
     hasMediumPad            boolean not null default 0,
     hasSmallPad             boolean not null default 0,

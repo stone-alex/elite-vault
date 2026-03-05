@@ -21,10 +21,11 @@ public interface StellarObjectDao {
      * Requires UNIQUE or PRIMARY KEY on systemAddress (already present in schema).
      */
     @SqlUpdate("""
-            INSERT INTO stellar_object (starSystem, bodyId, timestamp, systemAddress, x, y, z)
-            VALUES (:starSystem, :bodyId, :timestamp, :systemAddress, :x, :y, :z)
+            INSERT INTO stellar_object (starSystem, bodyId, bodyName, timestamp, systemAddress, x, y, z)
+            VALUES (:starSystem, :bodyId, :bodyName, :timestamp, :systemAddress, :x, :y, :z)
             ON DUPLICATE KEY UPDATE
                 starSystem  = VALUES(starSystem),
+                bodyName    = VALUES(bodyName),
                 bodyId      = VALUES(bodyId),
                 timestamp   = VALUES(timestamp),
                 x           = VALUES(x),
@@ -40,6 +41,7 @@ public interface StellarObjectDao {
             StellarObject entity = new StellarObject();
             entity.setTimestamp(rs.getString("timestamp"));
             entity.setStarSystem(rs.getString("starSystem"));
+            entity.setBodyName(rs.getString("bodyName"));
             entity.setSystemAddress(rs.getLong("systemAddress"));
             entity.setBodyId(rs.getLong("bodyId"));
             entity.setX(rs.getDouble("x"));
@@ -53,6 +55,7 @@ public interface StellarObjectDao {
     class StellarObject {
         private String timestamp;
         private String starSystem;
+        private String bodyName;
         private Long systemAddress;
         private Long bodyId;
         private double x, y, z;
@@ -111,6 +114,14 @@ public interface StellarObjectDao {
 
         public void setBodyId(Long bodyId) {
             this.bodyId = bodyId;
+        }
+
+        public String getBodyName() {
+            return bodyName;
+        }
+
+        public void setBodyName(String bodyName) {
+            this.bodyName = bodyName;
         }
     }
 }

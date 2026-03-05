@@ -53,6 +53,7 @@ public class StellarObjectManager {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
+        data.setBodyName(dto.getBodyName());
         data.setStarSystem(dto.getStarSystem());
         data.setSystemAddress(dto.getSystemAddress());
         data.setX(dto.getStarPos().get(0));
@@ -65,6 +66,7 @@ public class StellarObjectManager {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
+        data.setBodyName(dto.getBodyName());
         data.setStarSystem(dto.getBodyName());
         data.setSystemAddress(dto.getSystemAddress());
         data.setX(x);
@@ -113,6 +115,7 @@ public class StellarObjectManager {
                 }
                 entity.setPrimaryEconomy(station.getPrimaryEconomy());
                 entity.setServices(station.getServices());
+                entity.setStationType(station.getType());
                 dao.upsert(entity);
                 return Void.TYPE;
             });
