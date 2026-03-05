@@ -3,12 +3,15 @@ package elite.vault.api.services;
 import elite.vault.eddn.dto.EDDN_CommodityItemDto;
 import io.javalin.http.Context;
 import io.javalin.openapi.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import static elite.vault.Singletons.SINGLETONS;
 import static elite.vault.util.NumUtils.getIntSafely;
 
 public class CommoditiesService {
 
+    private static final Logger log = LogManager.getLogger(CommoditiesService.class);
     @OpenApi(
             summary = "Search commodities in local EDDN vault",
             description = "Filter market data by commodity, system, station, demand/supply, min profit. Paginated results from your stored data.",
