@@ -5,7 +5,6 @@ import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
-import org.jdbi.v3.sqlobject.customizer.BindList;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -49,25 +48,32 @@ public interface SystemDao {
 
 
     @SqlQuery("""
-            SELECT *
-            FROM star_system
-            WHERE
-              sector IN (<sectors>)
-              AND starName != :currentName
-              AND x BETWEEN :minX AND :maxX
-              AND y BETWEEN :minY AND :maxY
-              AND z BETWEEN :minZ AND :maxZ
-              AND (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) <= 250000.0
-            ORDER BY (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz)
-            LIMIT 300
+            WITH candidates AS (
+                    SELECT *, (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) AS dist_sq
+                    FROM star_system
+                    WHERE
+                        starName != :currentName
+                        AND x BETWEEN :minX AND :maxX
+                        AND y BETWEEN :minY AND :maxY
+                        AND z BETWEEN :minZ AND :maxZ
+                )
+                SELECT *
+                FROM candidates
+                WHERE
+                    dist_sq <= 250000.0
+                    AND (:minDistSq <= 0 OR dist_sq >= :minDistSq)
+                    AND (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) <  (:cx - :gx)*(:cx - :gx) + (:cy - :gy)*(:cy - :gy) + (:cz - :gz)*(:cz - :gz)
+                ORDER BY dist_sq desc
+                LIMIT 1
             """)
     List<StarSystem> findNeighbors(
             @Bind("minX") double minX, @Bind("maxX") double maxX,
             @Bind("minY") double minY, @Bind("maxY") double maxY,
             @Bind("minZ") double minZ, @Bind("maxZ") double maxZ,
             @Bind("cx") double cx, @Bind("cy") double cy, @Bind("cz") double cz,
-            @Bind("currentName") String currentName,
-            @BindList(value = "sectors", onEmpty = BindList.EmptyHandling.NULL_STRING) List<String> sectors
+            @Bind("gx") double gx, @Bind("gy") double gy, @Bind("gz") double gz,
+            @Bind("minDistSq") double minDistSq,  // NEW: dynamic sliver
+            @Bind("currentName") String currentName
     );
 
 

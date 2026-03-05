@@ -68,8 +68,21 @@ public class StarSystemManager {
         return Database.withDao(SystemDao.class, dao -> dao.findByName(starName));
     }
 
-    public List<SystemDao.StarSystem> findNeighbors(double v, double v1, double v2, double v3, double v4, double v5, double x, double y, double z, String currName, String currSector) {
-        return Database.withDao(SystemDao.class, dao -> dao.findNeighbors(v, v1, v2, v3, v4, v5, x, y, z, currName, getAdjacentSectors(currSector)));
+    public List<SystemDao.StarSystem> findNeighbors(double v, double v1, double v2,
+                                                    double v3, double v4, double v5,
+                                                    double currentX, double currentY, double currentZ,
+                                                    double goalX, double goalY, double goalZ,
+                                                    double minDistSq, String currName) {
+        return Database.withDao(
+                SystemDao.class,
+                dao -> dao.findNeighbors(
+                        v, v1, v2,
+                        v3, v4, v5,
+                        currentX, currentY, currentZ,
+                        goalX, goalY, goalZ,
+                        minDistSq, currName
+                )
+        );
     }
 
     public void saveBootStrapData(String sysName, long sysAddr, double x, double y, double z) {

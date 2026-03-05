@@ -73,13 +73,14 @@ public class CarrierRouteService {
                 ));
                 return;
             }
-
+            long startTime = System.currentTimeMillis();
             RouteResult result = computeRoute(start, goal, mgr);
+            long endTime = System.currentTimeMillis();
 
             ctx.json(new RouteResponse(
                     from, to, result.jumps(),
                     result.path(),
-                    result.jumps() > 0 ? null : "No route found (possibly disconnected at 500 ly)"
+                    result.jumps() > 0 ? "Route calculated in " + ((endTime - startTime) / 1000) + " seconds." : "No route found (possibly disconnected at 500 ly)"
             ));
 
         } catch (Exception e) {
@@ -101,33 +102,46 @@ public class CarrierRouteService {
         double h = heuristic(start, goal);
         fScore.put(startName, h);
         openSet.add(new Node(start, 0, h));
+        long startTime = System.currentTimeMillis();
 
         while (!openSet.isEmpty()) {
             Node currNode = openSet.poll();
             SystemDao.StarSystem current = currNode.obj;
             String currName = current.getStarName();
-
+            System.out.println("Processing node: " + currName + " \t\t\t\t\t\t" + current.getX() + " " + current.getY() + " " + current.getZ());
             if (currNode.fScore > fScore.getOrDefault(currName, Double.POSITIVE_INFINITY)) {
                 continue;
             }
 
             if (currName.equals(goal.getStarName())) {
+                long endTime = System.currentTimeMillis();
+                System.out.println("Route found in " + (endTime - startTime) + "ms");
                 return new RouteResult(reconstructPath(cameFrom, currName), gScore.get(currName));
             }
-
+            System.out.println(cameFrom.keySet());
             int tentativeG = gScore.get(currName) + 1;
+
+            double remainingLy = Math.hypot(Math.hypot(current.getX() - goal.getX(), current.getY() - goal.getY()), current.getZ() - goal.getZ());
+
+            double minLy = 250;
+            if (remainingLy < 500) minLy = 0;
+            double minDistSq = minLy * minLy;
+
+            System.out.printf("\nTentative Goal " + tentativeG + " " + currName + "\n");
 
             List<SystemDao.StarSystem> neighbors = mgr.findNeighbors(
                     current.getX() - CARRIER_MAX_JUMP_LY, current.getX() + CARRIER_MAX_JUMP_LY,
                     current.getY() - CARRIER_MAX_JUMP_LY, current.getY() + CARRIER_MAX_JUMP_LY,
                     current.getZ() - CARRIER_MAX_JUMP_LY, current.getZ() + CARRIER_MAX_JUMP_LY,
-                    current.getX(), current.getY(), current.getZ(),
-                    currName,
-                    current.getSector()
+                    current.getX(), current.getY(), current.getZ(),   // current node
+                    goal.getX(), goal.getY(), goal.getZ(),            // goal (forward cone)
+                    minDistSq,
+                    currName
             );
 
             for (SystemDao.StarSystem neigh : neighbors) {
                 String nName = neigh.getStarName();
+                System.out.println("\t\tNeighbor node: " + nName + " \t\t\t" + neigh.getX() + " " + neigh.getY() + " " + neigh.getZ());
                 if (tentativeG < gScore.getOrDefault(nName, Integer.MAX_VALUE)) {
                     cameFrom.put(nName, currName);
                     gScore.put(nName, tentativeG);
@@ -142,18 +156,13 @@ public class CarrierRouteService {
         return new RouteResult(List.of(), -1);
     }
 
-    private static double heuristic(SystemDao.StarSystem start, SystemDao.StarSystem destination) {
-        double deltaX = Math.abs(start.getX() - destination.getX());
-        double deltaY = Math.abs(start.getY() - destination.getY());
-        double deltaZ = Math.abs(start.getZ() - destination.getZ());
 
-        // Because galaxy is thin in Z → large Z differences are expensive
-        double maxAxis = Math.max(deltaX, Math.max(deltaY, deltaZ));
-        double midAxis = Math.max(Math.min(deltaX, deltaY), Math.min(Math.max(deltaX, deltaY), deltaZ)); // rough median
-        double smallAxis = deltaX + deltaY + deltaZ - maxAxis - midAxis;
-
-        // Very cheap approximation that is still admissible
-        return Math.ceil((maxAxis + 1.3 * midAxis + 1.8 * smallAxis) / 500.0);
+    private static double heuristic(SystemDao.StarSystem a, SystemDao.StarSystem b) {
+        double dx = Math.abs(a.getX() - b.getX());
+        double dy = Math.abs(a.getY() - b.getY());
+        double dz = Math.abs(a.getZ() - b.getZ());
+        double straight = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return Math.ceil(straight / 480.0);  // slight optimism: assume avg 480 ly effective
     }
 
     private static List<String> reconstructPath(Map<String, String> cameFrom, String current) {
@@ -172,7 +181,6 @@ public class CarrierRouteService {
         if (!path.isEmpty()) {
             path.removeFirst();
         }
-
         return path;
     }
 
