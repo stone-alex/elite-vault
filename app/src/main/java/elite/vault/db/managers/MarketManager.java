@@ -210,7 +210,7 @@ public final class MarketManager {
         }
 
         long endTime = System.currentTimeMillis();
-        route.setTimeToComplete("Time to complete " + ((endTime - startTime) / 1000) + " seconds");
+        route.setNote("Time to complete " + ((endTime - startTime) / 1000) + " seconds");
         route.setRoute(legs);
         return route;
     }

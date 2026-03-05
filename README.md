@@ -234,6 +234,6 @@ Response:
       "distanceLy": 6.1
     }
   },
-  "timeToComplete": "Route calculated in 183 seconds"
+  "note": "Route calculated in 183 seconds"
 }
 ```

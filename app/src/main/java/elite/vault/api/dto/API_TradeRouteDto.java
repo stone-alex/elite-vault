@@ -7,14 +7,14 @@ import java.util.Map;
 public class API_TradeRouteDto extends Convertable {
 
     private Map<Integer, API_TradePairDto> route;
-    private String timeToComplete;
+    private String note;
 
-    public String getTimeToComplete() {
-        return timeToComplete;
+    public String getNote() {
+        return note;
     }
 
-    public void setTimeToComplete(String timeToComplete) {
-        this.timeToComplete = timeToComplete;
+    public void setNote(String note) {
+        this.note = note;
     }
 
     public Map<Integer, API_TradePairDto> getRoute() {
