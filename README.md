@@ -50,6 +50,22 @@ or any custom tool that implements the REST API.
 - Messaging: JeroMQ (pure-Java ZeroMQ)
 - Logging: SLF4J + Logback
 
+----
+
+## Modules
+
+The server has three modules meant to run with systemctl or other process manager.
+
+1) API - provides REST API to query data
+2) Ingest - subscribes to EDDN and continuously updates the local data
+3) Bootsttrap - optional, allows to ingest initial nightly data dump from Spansh to get you started.
+
+- The server runs on Raspberry Pi 5 (minimum hardware requirement).
+- The database can run on Synology NAS.
+- Or run this on a Linux Desktop or a dedicated headless LINUX.
+- Database is MariaDB 10.3 or newer.
+- The services can be run on the same or different machines, as long as they have access to the same database.
+
 ## Examples:
 
 ### Fleet Carrier from Sol to Colonia
