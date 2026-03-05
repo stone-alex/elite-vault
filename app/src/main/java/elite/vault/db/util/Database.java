@@ -115,21 +115,24 @@ public class Database {
         String user = conf.getSystemKey(ConfigManager.DB_USER);
         String pass = conf.getSystemKey(ConfigManager.DB_PASS);
 
-        // 2025–2026 recommended MariaDB JDBC URL for good ingest performance
         String jdbcUrl = String.format(
                 "jdbc:mariadb://%s:%s/%s" +
                         "?useUnicode=true" +
                         "&characterEncoding=UTF-8" +
-                        "&connectionAttributes=program_name:EliteVault" +           // nice for server monitoring
-                        "&useServerPrepStmts=true" +                                // binary protocol (good for repeated queries)
+                        "&connectionAttributes=program_name:EliteVault" +
+                        "&useServerPrepStmts=true" +                  // binary protocol
                         "&cachePrepStmts=true" +
-                        "&prepStmtCacheSize=300" +
-                        "&prepStmtCacheSqlLimit=4096" +
-                        "&rewriteBatchedStatements=true" +                          // critical: turns many INSERTs into one multi-row INSERT
-                        "&socketTimeout=45000" +                                    // 45 seconds
-                        "&connectTimeout=15000" +
+                        "&prepStmtCacheSize=150" +                    // memory to run on Raspberry Pi
+                        "&prepStmtCacheSqlLimit=2048" +
+                        "&rewriteBatchedStatements=true" +
+                        "&socketTimeout=30000" +                      // 30 sec to fail on long queries
+                        "&connectTimeout=10000" +                     // 10 sec timeout
                         "&useLocalSessionState=true" +
-                        "&allowPublicKeyRetrieval=true",                            // only if needed for password auth
+                        "&useLocalTransactionState=true" +            // single-thread use
+                        "&cacheResultSetMetadata=true" +              // helps repeated SELECT * FROM ...
+                        "&maintainTimeStats=false" +                  // tiny overhead reduction
+                        "&useMysqlMetadata=true" +                    // faster metadata on MariaDB
+                        "&allowPublicKeyRetrieval=true",
                 host, port, dbName
         );
 
