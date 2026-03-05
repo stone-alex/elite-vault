@@ -85,6 +85,15 @@ public class StarSystemManager {
         );
     }
 
+    public List<SystemDao.StarSystem> findSystemsInCorridor(double minX, double maxX,
+                                                            double minY, double maxY,
+                                                            double minZ, double maxZ) {
+        return Database.withDao(
+                SystemDao.class,
+                dao -> dao.findSystemsInCorridor(minX, maxX, minY, maxY, minZ, maxZ)
+        );
+    }
+
     public void saveBootStrapData(String sysName, long sysAddr, double x, double y, double z) {
         Database.withDao(SystemDao.class, dao -> {
             dao.upsert(toEntity(sysName, sysAddr, x, y, z));

@@ -16,6 +16,7 @@ import static elite.vault.util.NumUtils.getIntSafely;
 public class CarrierRouteService {
 
     private static final double CARRIER_MAX_JUMP_LY = 500.0;
+    private static final double CARRIER_MAX_JUMP_SQ = CARRIER_MAX_JUMP_LY * CARRIER_MAX_JUMP_LY;
     private static final Logger log = LogManager.getLogger(CarrierRouteService.class);
 
     @OpenApi(
@@ -99,96 +100,203 @@ public class CarrierRouteService {
 
     private static RouteResult computeRoute(Integer jumpRange, SystemDao.StarSystem start, SystemDao.StarSystem goal, StarSystemManager mgr) {
 
-        Map<String, String> cameFrom = new HashMap<>();
-        Map<String, Integer> gScore = new HashMap<>();
-        Map<String, Double> fScore = new HashMap<>();
+        // === Phase 1: Bulk-load all systems in a corridor ===
+        double corridorPadding = CARRIER_MAX_JUMP_LY; // extra width around the straight line
+        double minX = Math.min(start.getX(), goal.getX()) - corridorPadding;
+        double maxX = Math.max(start.getX(), goal.getX()) + corridorPadding;
+        double minY = Math.min(start.getY(), goal.getY()) - corridorPadding;
+        double maxY = Math.max(start.getY(), goal.getY()) + corridorPadding;
+        double minZ = Math.min(start.getZ(), goal.getZ()) - corridorPadding;
+        double maxZ = Math.max(start.getZ(), goal.getZ()) + corridorPadding;
 
-        PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fScore));
+        log.info("Loading corridor systems...");
+        long loadStart = System.currentTimeMillis();
+        List<SystemDao.StarSystem> corridor = mgr.findSystemsInCorridor(minX, maxX, minY, maxY, minZ, maxZ);
+        long loadEnd = System.currentTimeMillis();
+        log.info("Loaded {} systems in {}ms", corridor.size(), loadEnd - loadStart);
 
-        String startName = start.getStarName();
-        gScore.put(startName, 0);
-        double h = heuristic(start, goal);
-        fScore.put(startName, h);
-        openSet.add(new Node(start, 0, h));
-        long startTime = System.currentTimeMillis();
+        if (corridor.isEmpty()) {
+            return new RouteResult(List.of(), -1);
+        }
 
-        while (!openSet.isEmpty()) {
-            Node currNode = openSet.poll();
-            SystemDao.StarSystem current = currNode.obj;
-            String currName = current.getStarName();
-            log.info("Processing node: " + currName + " " + current.getX() + " " + current.getY() + " " + current.getZ());
-            if (currNode.fScore > fScore.getOrDefault(currName, Double.POSITIVE_INFINITY)) {
-                continue;
+        // Build a lookup by name and ensure start/goal are present
+        Map<String, SystemDao.StarSystem> byName = new HashMap<>(corridor.size());
+        for (SystemDao.StarSystem s : corridor) {
+            byName.put(s.getStarName(), s);
+        }
+        byName.putIfAbsent(start.getStarName(), start);
+        byName.putIfAbsent(goal.getStarName(), goal);
+
+        // === Phase 2: Build spatial grid for fast neighbor lookups in memory ===
+        double cellSize = CARRIER_MAX_JUMP_LY;
+        Map<Long, List<SystemDao.StarSystem>> grid = new HashMap<>();
+        for (SystemDao.StarSystem s : byName.values()) {
+            long key = gridKey(s.getX(), s.getY(), s.getZ(), cellSize);
+            grid.computeIfAbsent(key, k -> new ArrayList<>()).add(s);
+        }
+
+        // === Phase 3: Greedy walk with backtracking — entirely in memory ===
+        double minDistSq = (double) jumpRange * jumpRange;
+        List<String> path = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        Deque<BacktrackFrame> backtrackStack = new ArrayDeque<>();
+
+        SystemDao.StarSystem current = start;
+        visited.add(current.getStarName());
+
+        while (true) {
+            double remainingLy = dist3d(current, goal);
+
+            if (remainingLy <= CARRIER_MAX_JUMP_LY) {
+                path.add(goal.getStarName());
+                return new RouteResult(path, path.size());
             }
 
-            if (currName.equals(goal.getStarName())) {
-                long endTime = System.currentTimeMillis();
-                log.info("Route found in " + (endTime - startTime) + "ms");
-
-                /// NOTE TODO: fetch fuel spots before sending.
-                return new RouteResult(reconstructPath(cameFrom, currName), gScore.get(currName));
-            }
-            int tentativeG = gScore.get(currName) + 1;
-
-            double remainingLy = Math.hypot(Math.hypot(current.getX() - goal.getX(), current.getY() - goal.getY()), current.getZ() - goal.getZ());
-
-            if (remainingLy < 500) jumpRange = 0;
-            double minDistSq = jumpRange * jumpRange;
-            log.info("Tentative Goal " + tentativeG + " " + currName + "\n");
-
-            List<SystemDao.StarSystem> neighbors = mgr.findNeighbors(
-                    current.getX() - CARRIER_MAX_JUMP_LY, current.getX() + CARRIER_MAX_JUMP_LY,
-                    current.getY() - CARRIER_MAX_JUMP_LY, current.getY() + CARRIER_MAX_JUMP_LY,
-                    current.getZ() - CARRIER_MAX_JUMP_LY, current.getZ() + CARRIER_MAX_JUMP_LY,
-                    current.getX(), current.getY(), current.getZ(),   // current node
-                    goal.getX(), goal.getY(), goal.getZ(),            // goal (forward cone)
-                    minDistSq,
-                    currName
+            // Find neighbors from grid (in memory — microseconds, not seconds)
+            double effectiveMinDistSq = (remainingLy > CARRIER_MAX_JUMP_LY * 1.5) ? minDistSq : 0.0;
+            List<SystemDao.StarSystem> candidates = findNeighborsInMemory(
+                    current, goal, grid, cellSize, effectiveMinDistSq, visited
             );
 
-            for (SystemDao.StarSystem neigh : neighbors) {
-                String nName = neigh.getStarName();
-                log.info("Neighbor node: " + nName + " " + neigh.getX() + " " + neigh.getY() + " " + neigh.getZ());
-                if (tentativeG < gScore.getOrDefault(nName, Integer.MAX_VALUE)) {
-                    cameFrom.put(nName, currName);
-                    gScore.put(nName, tentativeG);
-                    double fNew = tentativeG + heuristic(neigh, goal);
-                    fScore.put(nName, fNew);
-                    openSet.add(new Node(neigh, tentativeG, fNew));
+            SystemDao.StarSystem next = candidates.isEmpty() ? null : candidates.getFirst();
+
+            if (next == null) {
+                // Dead end — backtrack
+                if (backtrackStack.isEmpty()) {
+                    return new RouteResult(List.of(), -1);
+                }
+                BacktrackFrame frame = backtrackStack.peek();
+                boolean found = false;
+                for (int i = frame.nextCandidateIdx; i < frame.candidates.size(); i++) {
+                    SystemDao.StarSystem alt = frame.candidates.get(i);
+                    if (!visited.contains(alt.getStarName())) {
+                        path.removeLast();
+                        frame.nextCandidateIdx = i + 1;
+                        current = alt;
+                        visited.add(current.getStarName());
+                        path.add(current.getStarName());
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    backtrackStack.pop();
+                    if (!path.isEmpty()) path.removeLast();
+                    if (backtrackStack.isEmpty()) {
+                        return new RouteResult(List.of(), -1);
+                    }
+                    current = backtrackStack.peek().system;
+                    continue;
+                }
+            } else {
+                backtrackStack.push(new BacktrackFrame(current, candidates, 1));
+                current = next;
+                visited.add(current.getStarName());
+                path.add(current.getStarName());
+            }
+
+            if (path.size() > 5000) {
+                log.warn("Route search exceeded 5000 hops, aborting");
+                return new RouteResult(List.of(), -1);
+            }
+        }
+    }
+
+    /**
+     * In-memory neighbor search using spatial grid. Returns candidates sorted by
+     * distance-to-goal ascending (closest to goal first), filtered by forward-cone
+     * and jump range constraints.
+     */
+    private static List<SystemDao.StarSystem> findNeighborsInMemory(
+            SystemDao.StarSystem current,
+            SystemDao.StarSystem goal,
+            Map<Long, List<SystemDao.StarSystem>> grid,
+            double cellSize,
+            double minDistSq,
+            Set<String> visited
+    ) {
+        double cx = current.getX(), cy = current.getY(), cz = current.getZ();
+        double gx = goal.getX(), gy = goal.getY(), gz = goal.getZ();
+        double currentToGoalSq = (cx - gx) * (cx - gx) + (cy - gy) * (cy - gy) + (cz - gz) * (cz - gz);
+
+        int cellRadius = 1; // 500 ly jump / 500 ly cell = check adjacent cells
+        int baseCX = (int) Math.floor(cx / cellSize);
+        int baseCY = (int) Math.floor(cy / cellSize);
+        int baseCZ = (int) Math.floor(cz / cellSize);
+
+        List<SystemDao.StarSystem> result = new ArrayList<>();
+
+        for (int dx = -cellRadius; dx <= cellRadius; dx++) {
+            for (int dy = -cellRadius; dy <= cellRadius; dy++) {
+                for (int dz = -cellRadius; dz <= cellRadius; dz++) {
+                    long key = packKey(baseCX + dx, baseCY + dy, baseCZ + dz);
+                    List<SystemDao.StarSystem> cell = grid.get(key);
+                    if (cell == null) continue;
+
+                    for (SystemDao.StarSystem s : cell) {
+                        if (visited.contains(s.getStarName())) continue;
+
+                        double ddx = s.getX() - cx, ddy = s.getY() - cy, ddz = s.getZ() - cz;
+                        double distSq = ddx * ddx + ddy * ddy + ddz * ddz;
+
+                        if (distSq > CARRIER_MAX_JUMP_SQ) continue;  // too far to jump
+                        if (distSq < minDistSq) continue;            // too short (wasteful hop)
+
+                        // Forward-cone: neighbor must be closer to goal than current
+                        double neighToGoalSq = (s.getX() - gx) * (s.getX() - gx)
+                                + (s.getY() - gy) * (s.getY() - gy)
+                                + (s.getZ() - gz) * (s.getZ() - gz);
+                        if (neighToGoalSq >= currentToGoalSq) continue;
+
+                        result.add(s);
+                    }
                 }
             }
         }
 
-        // No route found
-        return new RouteResult(List.of(), -1);
+        // Sort by distance to goal (best candidates first)
+        result.sort(Comparator.comparingDouble(s -> {
+            double ddx = s.getX() - gx, ddy = s.getY() - gy, ddz = s.getZ() - gz;
+            return ddx * ddx + ddy * ddy + ddz * ddz;
+        }));
+
+        // Keep top candidates for backtracking
+        if (result.size() > 5) {
+            return result.subList(0, 5);
+        }
+        return result;
     }
 
-
-    private static double heuristic(SystemDao.StarSystem a, SystemDao.StarSystem b) {
-        double dx = Math.abs(a.getX() - b.getX());
-        double dy = Math.abs(a.getY() - b.getY());
-        double dz = Math.abs(a.getZ() - b.getZ());
-        double straight = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        return Math.ceil(straight / 480.0);  // slight optimism: assume avg 480 ly effective
+    private static long gridKey(double x, double y, double z, double cellSize) {
+        return packKey(
+                (int) Math.floor(x / cellSize),
+                (int) Math.floor(y / cellSize),
+                (int) Math.floor(z / cellSize)
+        );
     }
 
-    private static List<String> reconstructPath(Map<String, String> cameFrom, String current) {
-        List<String> path = new ArrayList<>();
+    private static long packKey(int ix, int iy, int iz) {
+        // Pack 3 ints into a long: 21 bits each (enough for ±1M range with 500 ly cells)
+        return ((long) (ix & 0x1FFFFF) << 42) | ((long) (iy & 0x1FFFFF) << 21) | (iz & 0x1FFFFF);
+    }
 
-        // Start from the *second*-to-last node (skip origin)
-        String at = current;
-        while (at != null) {
-            path.add(at);
-            at = cameFrom.get(at);
+    private static double dist3d(SystemDao.StarSystem a, SystemDao.StarSystem b) {
+        double dx = a.getX() - b.getX();
+        double dy = a.getY() - b.getY();
+        double dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private static class BacktrackFrame {
+        final SystemDao.StarSystem system;
+        final List<SystemDao.StarSystem> candidates;
+        int nextCandidateIdx;
+
+        BacktrackFrame(SystemDao.StarSystem system, List<SystemDao.StarSystem> candidates, int nextIdx) {
+            this.system = system;
+            this.candidates = candidates;
+            this.nextCandidateIdx = nextIdx;
         }
-
-        Collections.reverse(path);
-
-        // Remove the first element (which is now the start system)
-        if (!path.isEmpty()) {
-            path.removeFirst();
-        }
-        return path;
     }
 
     // DTOs for clean JSON
@@ -205,8 +313,5 @@ public class CarrierRouteService {
     }
 
     private record RouteResult(List<String> path, int jumps) {
-    }
-
-    private record Node(SystemDao.StarSystem obj, int g, double fScore) {
     }
 }

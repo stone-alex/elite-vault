@@ -49,22 +49,26 @@ public interface SystemDao {
 
     @SqlQuery("""
             WITH candidates AS (
-                    SELECT *, (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) AS dist_sq
+                    SELECT systemAddress, starName, x, y, z, date, sector,
+                           (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) AS dist_sq
                     FROM star_system
                     WHERE
                         starName != :currentName
-                        AND x BETWEEN :minX AND :maxX
-                        AND y BETWEEN :minY AND :maxY
+                        AND MBRContains(
+                            ST_Envelope(ST_GeomFromText(CONCAT(
+                                'LINESTRING(', :minX, ' ', :minY, ',', :maxX, ' ', :maxY, ')'))),
+                            pos
+                        )
                         AND z BETWEEN :minZ AND :maxZ
                 )
-                SELECT *
+                SELECT systemAddress, starName, x, y, z, date, sector
                 FROM candidates
                 WHERE
                     dist_sq <= 250000.0
                     AND (:minDistSq <= 0 OR dist_sq >= :minDistSq)
                     AND (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) <  (:cx - :gx)*(:cx - :gx) + (:cy - :gy)*(:cy - :gy) + (:cz - :gz)*(:cz - :gz)
-                ORDER BY dist_sq desc
-                LIMIT 1
+                ORDER BY (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) ASC
+                LIMIT 5
             """)
     List<StarSystem> findNeighbors(
             @Bind("minX") double minX, @Bind("maxX") double maxX,
@@ -74,6 +78,23 @@ public interface SystemDao {
             @Bind("gx") double gx, @Bind("gy") double gy, @Bind("gz") double gz,
             @Bind("minDistSq") double minDistSq,  // NEW: dynamic sliver
             @Bind("currentName") String currentName
+    );
+
+
+    @SqlQuery("""
+            SELECT systemAddress, starName, x, y, z, date, sector
+            FROM star_system
+            WHERE MBRContains(
+                    ST_Envelope(ST_GeomFromText(CONCAT(
+                        'LINESTRING(', :minX, ' ', :minY, ',', :maxX, ' ', :maxY, ')'))),
+                    pos
+                  )
+              AND z BETWEEN :minZ AND :maxZ
+            """)
+    List<StarSystem> findSystemsInCorridor(
+            @Bind("minX") double minX, @Bind("maxX") double maxX,
+            @Bind("minY") double minY, @Bind("maxY") double maxY,
+            @Bind("minZ") double minZ, @Bind("maxZ") double maxZ
     );
 
 
