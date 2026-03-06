@@ -77,7 +77,7 @@ public class BootstrapEntryDto extends BaseDto {
     private Double axialTilt;
 
     @SerializedName("parents")
-    private List<Map<String, Long>> parents;
+    private List<Map<String, Integer>> parents;
 
     @SerializedName("orbitalPeriod")
     private Double orbitalPeriod;
@@ -215,7 +215,7 @@ public class BootstrapEntryDto extends BaseDto {
         return axialTilt;
     }
 
-    public List<Map<String, Long>> getParents() {
+    public List<Map<String, Integer>> getParents() {
         return parents;
     }
 

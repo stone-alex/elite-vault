@@ -232,3 +232,13 @@ alter table stellar_object
 add column landable boolean;
 alter table stellar_object
 add column tidalLock boolean;
+
+
+create table if not exists parents (
+    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress bigint not null,
+    bodyId        bigint not null,
+    parentBodyId  bigint not null,
+    parentType    varchar(12),
+    unique key uk_parents_system_body(systemAddress, bodyId)
+);

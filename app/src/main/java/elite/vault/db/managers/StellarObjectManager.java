@@ -1,16 +1,15 @@
 package elite.vault.db.managers;
 
 import elite.vault.bootstrap.BootstrapEntryDto;
-import elite.vault.db.dao.MaterialsDao;
-import elite.vault.db.dao.RingsDao;
-import elite.vault.db.dao.StationsDao;
-import elite.vault.db.dao.StellarObjectDao;
+import elite.vault.db.dao.*;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
 import elite.vault.eddn.dto.EDDN_MaterialDto;
 import elite.vault.eddn.dto.EddnDto;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class StellarObjectManager {
 
@@ -28,8 +27,26 @@ public class StellarObjectManager {
             dao.upsert(toEntity(data));
             return Void.TYPE;
         });
-
+        saveParents(data.getParents(), data.getSystemAddress(), data.getBodyId());
         saveMaterials(data.getMaterials(), data.getSystemAddress(), data.getBodyId(), data.getBodyName());
+    }
+
+    private void saveParents(List<Map<String, Integer>> parents, Long systemAddress, Long bodyId) {
+        for (Map<String, Integer> parent : parents) {
+            Set<String> set = parent.keySet();
+            for (String s : set) {
+                if ("Null".equalsIgnoreCase(s)) continue;
+                Database.withDao(ParentsDao.class, dao -> {
+                    ParentsDao.Parent entity = new ParentsDao.Parent();
+                    entity.setBodyId(bodyId);
+                    entity.setSystemAddress(systemAddress);
+                    entity.setParentType(s);
+                    entity.setParentBodyId(parent.get(s));
+                    dao.upsert(entity);
+                    return Void.TYPE;
+                });
+            }
+        }
     }
 
 
@@ -129,6 +146,7 @@ public class StellarObjectManager {
             return Void.TYPE;
         });
 
+        saveParents(entry.getParents(), sysAddr, entry.getBodyId());
         ///
         List<BootstrapEntryDto.Ring> rings = entry.getRings();
         if (rings != null && !rings.isEmpty()) {
