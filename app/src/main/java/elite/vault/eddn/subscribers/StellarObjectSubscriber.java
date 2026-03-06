@@ -40,6 +40,8 @@ public class StellarObjectSubscriber {
             } else {
                 SINGLETONS.getStellarObjectManager().savePartial(data);
             }
+        } else if ("Location".equalsIgnoreCase(event.getEventType())) {
+
         }
     }
 }

@@ -37,9 +37,9 @@ public class StationManager {
             entity.setRealName(data.getStationName());
             entity.setGovernment(data.getStationGovernment());
             if (data.getLandingPads() != null) {
-                entity.setHasLargePad(data.getLandingPads().getLarge() > 0);
-                entity.setHasMediumPad(data.getLandingPads().getMedium() > 0);
-                entity.setHasSmallPad(data.getLandingPads().getSmall() > 0);
+                entity.setHasLargePad(data.getLandingPads().getLarge() != null && data.getLandingPads().getLarge() > 0);
+                entity.setHasMediumPad(data.getLandingPads().getMedium() != null && data.getLandingPads().getMedium() > 0);
+                entity.setHasSmallPad(data.getLandingPads().getSmall() != null && data.getLandingPads().getSmall() > 0);
             }
             entity.setPrimaryEconomy(data.getStationEconomy());
             entity.setServices(services.toString());

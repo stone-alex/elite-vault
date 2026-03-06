@@ -21,12 +21,10 @@ public class CommoditySubscriber {
             return;
         }
 
-        // No need to check eventType() — it's always null here
         EddnDto data = event.getData();
-        SystemDao.StarSystem star = starSystemManager.findByName(data.getStarSystem());
+        SystemDao.StarSystem star = starSystemManager.findByName(data.getSystemName());
         if (star == null) return;
         log.info("\nMarket update " + data.getMarketId() + " " + data.getStarSystem() + " " + data.getStationName());
         SINGLETONS.getMarketManager().save(data, star.getSystemAddress(), star.getX(), star.getY(), star.getZ());
-
     }
 }

@@ -120,9 +120,9 @@ public interface StellarObjectDao {
         private Double surfaceGravity;
         private Double surfacePressure;
         private Double surfaceTemperature;
-
         private Boolean landable;
         private boolean tidalLock;
+
 
         public String getTimestamp() {
             return timestamp;

@@ -201,10 +201,10 @@ public class EddnDto extends BaseDto {
     @SerializedName("DistFromStarLS")
     private Double distFromStarLs;          // Distance from arrival / main star in LS (common in Docked/Location)
 
-    @SerializedName("MarketID")
+    @SerializedName("marketId")
     private Long marketId;                  // Unique ID for the market / station
 
-    @SerializedName("StationName")
+    @SerializedName("stationName")
     private String stationName;             // "Celsius Prospect", etc.
 
     @SerializedName("StationType")

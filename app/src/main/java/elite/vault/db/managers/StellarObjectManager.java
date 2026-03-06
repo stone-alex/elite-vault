@@ -81,7 +81,7 @@ public class StellarObjectManager {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
-        data.setBodyName(dto.getBodyName());
+        data.setBodyName(dto.getBodyName() == null ? dto.getBody() : dto.getBodyName());
         data.setSystemAddress(dto.getSystemAddress());
         data.setX(dto.getStarPos().get(0));
         data.setY(dto.getStarPos().get(1));

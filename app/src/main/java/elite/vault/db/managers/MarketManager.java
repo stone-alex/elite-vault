@@ -33,7 +33,7 @@ public final class MarketManager {
         });
 
         Database.withDao(MarketDao.class, dao -> {
-            dao.upsert(toEntity(data), systemAddress);
+            dao.upsert(toEntity(data, systemAddress), systemAddress);
             List<EDDN_CommodityItemDto> commodities = data.getCommodities();
             saveCommodities(commodities, data.getMarketId(), systemAddress, x, y, z);
             return Void.TYPE;
@@ -66,12 +66,13 @@ public final class MarketManager {
     }
 
 
-    private MarketDao.Market toEntity(EddnDto data) {
+    private MarketDao.Market toEntity(EddnDto data, Long systemAddress) {
         MarketDao.Market entity = new MarketDao.Market();
         entity.setTimestamp(TimeUtil.toEntityDateTime(data.getTimestamp()));
         entity.setData(data.toJson());
         entity.setMarketId(data.getMarketId());
-        entity.setStarSystem(data.getStarSystem());
+        entity.setSystemAddress(systemAddress);
+        entity.setStarSystem(data.getSystemName());
         entity.setStationName(data.getStationName());
         return entity;
     }

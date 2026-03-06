@@ -242,3 +242,5 @@ create table if not exists parents (
     parentType    varchar(12),
     unique key uk_parents_system_body(systemAddress, bodyId)
 );
+
+-- // -- -- // -- -- // -- -- // -- -- // -- -- // -- -- // -- -- // --
