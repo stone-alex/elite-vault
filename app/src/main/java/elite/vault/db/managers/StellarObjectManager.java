@@ -24,12 +24,23 @@ public class StellarObjectManager {
     }
 
     public void save(EddnDto data) {
-        saveMaterials(data.getMaterials(), data.getSystemAddress(), data.getBodyId(), data.getBodyName());
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(data));
             return Void.TYPE;
         });
 
+        saveMaterials(data.getMaterials(), data.getSystemAddress(), data.getBodyId(), data.getBodyName());
+    }
+
+
+    public void savePartial(EddnDto data) {
+        Database.withDao(StellarObjectDao.class, dao -> {
+            StellarObjectDao.StellarObject entity = dao.findBy(data.getSystemAddress(), data.getBodyId());
+            if (entity == null) {
+                dao.upsert(toEntity(data));
+            }
+            return Void.TYPE;
+        });
     }
 
     private void saveMaterials(List<EDDN_MaterialDto> materials, Long systemAddress, Long bodyId, String bodyName) {
@@ -54,11 +65,29 @@ public class StellarObjectManager {
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
         data.setBodyName(dto.getBodyName());
-        data.setStarSystem(dto.getStarSystem());
         data.setSystemAddress(dto.getSystemAddress());
         data.setX(dto.getStarPos().get(0));
         data.setY(dto.getStarPos().get(1));
         data.setZ(dto.getStarPos().get(2));
+        data.setAtmosphereType(dto.getAtmosphereType());
+        data.setDistanceFromArrivalLs(dto.getDistanceFromArrivalLs());
+        data.setEccentricity(dto.getEccentricity());
+        data.setLandable(dto.getLandable());
+        data.setMassEm(dto.getMassEm());
+        data.setMeanAnomaly(dto.getMeanAnomaly());
+        data.setOrbitalInclination(dto.getOrbitalInclination());
+        data.setOrbitalPeriod(dto.getOrbitalPeriod());
+        data.setPeriapsis(dto.getPeriapsis());
+        data.setPlanetClass(dto.getPlanetClass());
+        data.setRadius(dto.getRadius());
+        data.setRotationPeriod(dto.getRotationPeriod());
+        data.setSemiMajorAxis(dto.getSemiMajorAxis());
+        data.setSurfaceGravity(dto.getSurfaceGravity());
+        data.setSurfacePressure(dto.getSurfacePressure());
+        data.setSurfaceTemperature(dto.getSurfaceTemperature());
+        data.setTerraformState(dto.getTerraformState());
+        data.setTidalLock(dto.getTidalLock() != null && dto.getTidalLock());
+        data.setVolcanism(dto.getVolcanism());
         return data;
     }
 
@@ -67,11 +96,29 @@ public class StellarObjectManager {
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());
         data.setBodyName(dto.getBodyName());
-        data.setStarSystem(dto.getBodyName());
         data.setSystemAddress(dto.getSystemAddress());
         data.setX(x);
         data.setY(y);
         data.setZ(z);
+        data.setAtmosphereType(dto.getAtmosphereType());
+        data.setDistanceFromArrivalLs(dto.getDistanceToArrival());
+        //data.setEccentricity
+        data.setLandable(dto.getLandable());
+        //data.setMassEm
+        data.setMeanAnomaly(dto.getMeanAnomaly());
+        data.setOrbitalInclination(dto.getOrbitalInclination());
+        data.setOrbitalPeriod(dto.getOrbitalPeriod());
+        //data.setPeriapsis
+        //data.setPlanetClass
+        data.setRadius(dto.getRadius());
+        data.setRotationPeriod(dto.getRotationalPeriod());
+        data.setSemiMajorAxis(dto.getSemiMajorAxis());
+        data.setSurfaceGravity(dto.getGravity());
+        data.setSurfacePressure(dto.getSurfacePressure());
+        data.setSurfaceTemperature(dto.getSurfaceTemperature());
+        data.setTerraformState(dto.getTerraformingState());
+        //data.setTidalLock
+        data.setVolcanism(dto.getVolcanismType());
         return data;
     }
 

@@ -190,3 +190,45 @@ create index if not exists idx_powerplay_state on powerplay_state(systemAddress)
 
 -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- // -- //
 
+alter table stellar_object
+drop column starSystem;
+alter table stellar_object
+add column atmosphereType text;
+alter table stellar_object
+add column planetClass text;
+alter table stellar_object
+add column terraformState text;
+alter table stellar_object
+add column volcanism text;
+
+alter table stellar_object
+add column eccentricity double;
+alter table stellar_object
+add column distanceFromArrivalLs double;
+alter table stellar_object
+add column massEm double;
+alter table stellar_object
+add column meanAnomaly double;
+alter table stellar_object
+add column orbitalInclination double;
+alter table stellar_object
+add column orbitalPeriod double;
+alter table stellar_object
+add column periapsis double;
+alter table stellar_object
+add column radius double;
+alter table stellar_object
+add column rotationPeriod double;
+alter table stellar_object
+add column semiMajorAxis double;
+alter table stellar_object
+add column surfaceGravity double;
+alter table stellar_object
+add column surfacePressure double;
+alter table stellar_object
+add column surfaceTemperature double;
+
+alter table stellar_object
+add column landable boolean;
+alter table stellar_object
+add column tidalLock boolean;
