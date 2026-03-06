@@ -15,11 +15,37 @@ and bodies accumulate slowly.
 
 ### Why Elite Vault?
 
-Custom REST API for for commodity prices, powerplay data and galaxy navigation.
+Custom REST API for commodity prices, powerplay data and galaxy navigation.
 
 Third-party sites are great until the maintainer retires, the server goes offline, or the "unofficial API" breaks.
 Elite Vault gives you full control: your data, your uptime, your queries are accessible from [Elite Intel](https://github.com/stone-alex/EliteIntel)
 or any custom tool that implements the REST API.
+
+The goal is to solve the ecosystem pain points:
+
+- unstable upstreams
+- unofficial scraping
+- partial datasets
+- scattered APIs
+- single-maintainer single-point-of-failure services
+- poor integration ergonomics
+
+with
+
+- local data hub
+- reliable local storage
+- self-hosted
+- user-controlled
+- resilient to external outages
+- developer platform
+- stable REST API
+- documented contracts
+- consistent schema
+- sane integration story for clients like Elite Intel / COVAS:NEXT / EDCoPilot
+- resilience layer
+- bootstrap from bulk dump
+- keep current via EDDN ingest
+- later mesh/federation to reduce single points of failure
 
 ----
 ### Key Features
