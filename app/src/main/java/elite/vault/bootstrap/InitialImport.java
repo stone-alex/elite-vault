@@ -7,7 +7,7 @@ import java.nio.file.Path;
 
 public class InitialImport {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         BootstrapImporter importer = BootstrapImporter.getInstance();
         importer.importFromFile(
                 Path.of(
