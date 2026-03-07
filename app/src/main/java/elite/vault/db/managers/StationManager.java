@@ -26,6 +26,7 @@ public class StationManager {
         if (data.getStationServices() != null) data.getStationServices().forEach(service -> services.append(service).append(", "));
 
         Database.withDao(StationsDao.class, dao -> {
+            if (data.getMarketId() == null) return Void.TYPE;
             StationsDao.Station entity = new StationsDao.Station();
             entity.setDistanceToArrival(data.getDistFromStarLs());
             entity.setStationId(data.getMarketId());

@@ -32,6 +32,7 @@ public class StellarObjectManager {
     }
 
     private void saveParents(List<Map<String, Integer>> parents, Long systemAddress, Long bodyId) {
+        if (parents == null) return;
         for (Map<String, Integer> parent : parents) {
             Set<String> set = parent.keySet();
             for (String s : set) {
@@ -171,7 +172,7 @@ public class StellarObjectManager {
                 entity.setControllingFactionState(station.getControllingFactionState());
                 entity.setDistanceToArrival(station.getDistanceToArrival());
                 entity.setEconomies(station.getEconomies());
-                entity.setRealName(station.getRealName());
+                entity.setRealName(station.getRealName() == null ? station.getName() : station.getRealName());
                 entity.setGovernment(station.getGovernment());
                 if (station.getLandingPads() != null) {
                     entity.setHasLargePad(station.getLandingPads().getLarge() > 0);

@@ -20,10 +20,12 @@ public class StellarObjectSubscriber {
     public void onEvent(EddnMessageEvent event) {
         if (!event.isJournal()) return;
         if (!events.contains(event.getEventType())) return;
+        EventProcessingExecutor.submit(() -> update(event));
+    }
 
+    private static void update(EddnMessageEvent event) {
         EddnDto data = event.getData();
         if (data == null) return;
-
         /// cherry-pick data
         ///  save star
         if (data.getStarPos() != null && data.getStarSystem() != null) {

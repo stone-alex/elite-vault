@@ -244,3 +244,15 @@ create table if not exists parents (
 );
 
 -- // -- -- // -- -- // -- -- // -- -- // -- -- // -- -- // -- -- // --
+alter table market
+drop column timestamp;
+alter table market
+add column timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+alter table market_commodity
+drop column timestamp;
+alter table market_commodity
+add column timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+create index idx_market_timestamp on market(timestamp);
+create index idx_market_commodity_timestamp on market_commodity(timestamp);

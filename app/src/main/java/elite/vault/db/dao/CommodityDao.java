@@ -1,6 +1,5 @@
 package elite.vault.db.dao;
 
-
 import elite.vault.db.projections.CommodityOfferProjection;
 import elite.vault.db.projections.TradePairProjection;
 import org.jdbi.v3.core.mapper.RowMapper;
@@ -20,15 +19,15 @@ import java.util.List;
 public interface CommodityDao {
 
     @SqlUpdate("""
-            INSERT INTO market_commodity (marketId,commodity, buyPrice, sellPrice, stock, demand, systemAddress, x, y, z, timestamp, pos)
-            VALUES (:marketId, :commodity, :buyPrice, :sellPrice, :stock, :demand, :systemAddress, :x, :y, :z, :timestamp, ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')')))
+            INSERT INTO market_commodity (marketId, commodity, buyPrice, sellPrice, stock, demand, systemAddress, x, y, z, timestamp, pos)
+            VALUES (:marketId, :commodity, :buyPrice, :sellPrice, :stock, :demand, :systemAddress, :x, :y, :z, CURRENT_TIMESTAMP, ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')')))
             ON DUPLICATE KEY UPDATE
                 commodity = VALUES(commodity),
                 buyPrice  = VALUES(buyPrice),
                 sellPrice = VALUES(sellPrice),
                 stock     = VALUES(stock),
                 demand    = VALUES(demand),
-                timestamp = VALUES(timestamp),
+                timestamp = CURRENT_TIMESTAMP,
                 x = VALUES(x),
                 y = VALUES(y),
                 z = VALUES(z),
@@ -65,7 +64,6 @@ public interface CommodityDao {
             @Bind("refY") double refY
     );
 
-
     @RegisterBeanMapper(TradePairProjection.class)
     @SqlQuery("""
             SELECT
@@ -100,10 +98,6 @@ public interface CommodityDao {
             @Bind("maxDistFromEntrance") double maxDistFromEntrance
     );
 
-    /**
-     * Find the best SELL destination for a specific commodity near (refX, refY).
-     * stationId == marketId. Uses spatial index (constant point reference).
-     */
     @RegisterBeanMapper(TradePairProjection.class)
     @SqlQuery("""
             SELECT
@@ -141,10 +135,6 @@ public interface CommodityDao {
             @Bind("maxDistFromEntrance") double maxDistFromEntrance
     );
 
-    /**
-     * Find cheapest commodities to buy AT a specific station (marketId).
-     * Used for hops 2+, where you're already at the sell destination of the previous leg.
-     */
     @RegisterBeanMapper(TradePairProjection.class)
     @SqlQuery("""
             SELECT
@@ -174,7 +164,8 @@ public interface CommodityDao {
 
     class CommodityMapper implements RowMapper<Commodity> {
 
-        @Override public Commodity map(ResultSet rs, StatementContext ctx) throws SQLException {
+        @Override
+        public Commodity map(ResultSet rs, StatementContext ctx) throws SQLException {
             Commodity entity = new Commodity();
             entity.setCommodity(rs.getString("commodity"));
             entity.setMarketId(rs.getLong("marketId"));
@@ -186,7 +177,6 @@ public interface CommodityDao {
             entity.setX(rs.getDouble("x"));
             entity.setY(rs.getDouble("y"));
             entity.setZ(rs.getDouble("z"));
-            entity.setTimestamp(rs.getString("timestamp"));
             return entity;
         }
     }
@@ -200,7 +190,6 @@ public interface CommodityDao {
         Integer demand;
         Long systemAddress;
         Double x, y, z;
-        String timestamp;
 
         public String getCommodity() {
             return commodity;
@@ -282,18 +271,8 @@ public interface CommodityDao {
             this.marketId = marketId;
         }
 
-        public String getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(String timestamp) {
-            this.timestamp = timestamp;
-        }
-
         public String getPosWkt() {
             return String.format("POINT(%f %f)", getX(), getY());
         }
     }
-
-
 }

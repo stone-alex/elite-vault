@@ -9,7 +9,6 @@ import elite.vault.db.dao.SystemDao;
 import elite.vault.db.projections.CommodityOfferProjection;
 import elite.vault.db.projections.TradePairProjection;
 import elite.vault.db.util.Database;
-import elite.vault.db.util.TimeUtil;
 import elite.vault.eddn.dto.EDDN_CommodityItemDto;
 import elite.vault.eddn.dto.EddnDto;
 
@@ -27,21 +26,37 @@ public final class MarketManager {
     }
 
     public void save(EddnDto data, Long systemAddress, double x, double y, double z) {
-        Database.withDao(MarketDao.class, dao -> {
-            dao.prune();
-            return Void.TYPE;
-        });
+        if (data == null || systemAddress == null) {
+            return;
+        }
+
+        Long marketId = data.getMarketId();
+        if (marketId == null) {
+            return;
+        }
+
+        List<EDDN_CommodityItemDto> commodities = data.getCommodities();
+        if (commodities == null) {
+            commodities = Collections.emptyList();
+        }
 
         Database.withDao(MarketDao.class, dao -> {
-            dao.upsert(toEntity(data, systemAddress), systemAddress);
-            List<EDDN_CommodityItemDto> commodities = data.getCommodities();
-            saveCommodities(commodities, data.getMarketId(), systemAddress, x, y, z);
+            dao.upsert(toEntity(data, systemAddress));
             return Void.TYPE;
         });
+        saveCommodities(commodities, marketId, systemAddress, x, y, z);
     }
 
     private void saveCommodities(List<EDDN_CommodityItemDto> data, long marketId, long systemAddress, double x, double y, double z) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
+
         for (EDDN_CommodityItemDto d : data) {
+            if (d == null || d.getName() == null) {
+                continue;
+            }
+
             Database.withDao(CommodityDao.class, dao -> {
                 dao.upsert(toEntity(d, marketId, systemAddress, x, y, z));
                 return Void.TYPE;
@@ -51,7 +66,6 @@ public final class MarketManager {
 
     private CommodityDao.Commodity toEntity(EDDN_CommodityItemDto data, long marketId, long systemAddress, double x, double y, double z) {
         CommodityDao.Commodity entity = new CommodityDao.Commodity();
-        entity.setTimestamp(TimeUtil.getCurrentTimestamp());
         entity.setBuyPrice(data.getBuyPrice());
         entity.setSellPrice(data.getSellPrice());
         entity.setCommodity(data.getName());
@@ -65,10 +79,8 @@ public final class MarketManager {
         return entity;
     }
 
-
     private MarketDao.Market toEntity(EddnDto data, Long systemAddress) {
         MarketDao.Market entity = new MarketDao.Market();
-        entity.setTimestamp(TimeUtil.toEntityDateTime(data.getTimestamp()));
         entity.setData(data.toJson());
         entity.setMarketId(data.getMarketId());
         entity.setSystemAddress(systemAddress);
@@ -110,24 +122,19 @@ public final class MarketManager {
         double curX = origin.getX();
         double curY = origin.getY();
 
-        // For hop 1, we search for buy offers near the player.
-        // For hops 2+, we look at what's available to buy AT the previous sell station.
-        Long currentStationMarketId = null; // null means "search nearby" (hop 1)
+        Long currentStationMarketId = null;
         Set<String> usedTrades = new HashSet<>();
 
         for (int hop = 1; hop <= numTrades; hop++) {
             final double refX = curX;
             final double refY = curY;
 
-            // Step 1: Get buy offers
             List<TradePairProjection> buyOffers;
             if (currentStationMarketId == null) {
-                // Hop 1: search for buy offers near starting location
                 buyOffers = Database.withDao(CommodityDao.class,
                         dao -> dao.findBuyOffers(jumpRange, refX, refY, maxDistanceFromEntrance)
                 );
             } else {
-                // Hop 2+: what can we buy AT the station we just sold at?
                 final long stationId = currentStationMarketId;
                 buyOffers = Database.withDao(CommodityDao.class,
                         dao -> dao.findBuyOffersAtStation(stationId)
@@ -136,7 +143,6 @@ public final class MarketManager {
 
             if (buyOffers.isEmpty()) break;
 
-            // Step 2: For each buy candidate, find best sell destination
             TradePairProjection bestBuy = null;
             TradePairProjection bestSell = null;
             double bestProfit = 0;
@@ -146,8 +152,6 @@ public final class MarketManager {
                 if (checked >= 5) break;
                 checked++;
 
-                // For hop 1, use the buy station's coords as sell search origin.
-                // For hop 2+, the buy station IS the current station, use its coords.
                 final double bx = (buy.getBuyX() != 0) ? buy.getBuyX() : refX;
                 final double by = (buy.getBuyY() != 0) ? buy.getBuyY() : refY;
                 final double minSell = buy.getBuyPrice();
@@ -195,7 +199,6 @@ public final class MarketManager {
 
             legs.put(hop, dto);
 
-            // Next hop: we're now AT the sell station
             currentStationMarketId = bestSell.getSellMarketId();
 
             final String sellSystemName = bestSell.getSellSystem();
@@ -214,5 +217,12 @@ public final class MarketManager {
         route.setNote("Time to complete " + ((endTime - startTime) / 1000) + " seconds");
         route.setRoute(legs);
         return route;
+    }
+
+    public void prune() {
+        Database.withDao(MarketDao.class, dao -> {
+            dao.prune();
+            return Void.TYPE;
+        });
     }
 }

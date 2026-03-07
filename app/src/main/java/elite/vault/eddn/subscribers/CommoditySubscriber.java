@@ -20,11 +20,14 @@ public class CommoditySubscriber {
         if (!event.schemaRef().contains("commodity/3")) {
             return;
         }
+        EventProcessingExecutor.submit(() -> update(event));
+    }
 
+    private void update(EddnMessageEvent event) {
         EddnDto data = event.getData();
         SystemDao.StarSystem star = starSystemManager.findByName(data.getSystemName());
         if (star == null) return;
-        log.info("\nMarket update " + data.getMarketId() + " " + data.getStarSystem() + " " + data.getStationName());
+        log.info("Market update " + data.getMarketId() + " " + star.getStarName() + " " + data.getStationName());
         SINGLETONS.getMarketManager().save(data, star.getSystemAddress(), star.getX(), star.getY(), star.getZ());
     }
 }
