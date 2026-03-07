@@ -51,6 +51,9 @@ dependencies {
 
     // MariaDB
     implementation 'org.mariadb.jdbc:mariadb-java-client:3.5.0'
+
+    // Connection pooling
+    implementation 'com.zaxxer:HikariCP:6.2.1'
 }
 
 java {

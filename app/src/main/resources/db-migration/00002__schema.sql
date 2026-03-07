@@ -86,4 +86,7 @@ CREATE EVENT maintain_commodity_partitions_hourly
     ON SCHEDULE EVERY 1 HOUR
         STARTS CURRENT_TIMESTAMP + INTERVAL 5 MINUTE
     DO
-    CALL maintain_commodity_partitions(72, 6)
+    CALL maintain_commodity_partitions(72, 6);
+
+/*SPLIT*/
+SET GLOBAL event_scheduler = ON;

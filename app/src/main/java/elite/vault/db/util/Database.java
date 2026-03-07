@@ -1,5 +1,7 @@
 package elite.vault.db.util;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import elite.vault.ConfigManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,6 +22,7 @@ public class Database {
     private static final Logger log = LogManager.getLogger(Database.class);
 
     private static final Jdbi JDBI;
+    private static final HikariDataSource dataSource;
     private static final ConfigManager conf = ConfigManager.getInstance();
 
     private static void migrateIfNeeded() {
@@ -173,12 +176,34 @@ public class Database {
                 host, port, dbName
         );
 
-        JDBI = Jdbi.create(jdbcUrl, user, pass)
+        // Configure HikariCP connection pool
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(jdbcUrl);
+        config.setUsername(user);
+        config.setPassword(pass);
+
+        // Pool sizing for high-throughput EDDN ingest
+        config.setMaximumPoolSize(20);              // Max connections
+        config.setMinimumIdle(5);                   // Keep 5 warm connections
+        config.setConnectionTimeout(10000);         // 10s to get connection from pool
+        config.setIdleTimeout(300000);              // 5min idle before closing
+        config.setMaxLifetime(600000);              // 10min max connection lifetime
+        config.setKeepaliveTime(120000);            // 2min keepalive ping
+
+        // Performance tuning
+        config.setPoolName("EliteVaultPool");
+        config.setAutoCommit(true);
+        config.setLeakDetectionThreshold(60000);    // Warn if connection held > 60s
+
+        dataSource = new HikariDataSource(config);
+
+        JDBI = Jdbi.create(dataSource)
                 .installPlugin(new SqlObjectPlugin());
 
         try (var h = JDBI.open()) {
             String version = h.createQuery("SELECT VERSION()").mapTo(String.class).one();
-            log.info("Connected to MariaDB version: {}", version);
+            log.info("Connected to MariaDB version: {} with HikariCP pool (max={}, min={})",
+                    version, config.getMaximumPoolSize(), config.getMinimumIdle());
         } catch (Exception e) {
             throw new RuntimeException(
                     "MariaDB connection failed. Check host/port/credentials/database existence.\n" +
