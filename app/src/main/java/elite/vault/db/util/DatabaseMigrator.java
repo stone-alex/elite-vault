@@ -10,6 +10,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Set;
@@ -24,8 +26,6 @@ public class DatabaseMigrator {
     private static final String MIGRATIONS_PATH = "/db-migration";
 
     public static void migrate(Handle handle) throws Exception {
-        // No PRAGMA journal_mode anymore
-
         handle.execute("""
                 CREATE TABLE IF NOT EXISTS schema_migration (
                     version     VARCHAR(255) PRIMARY KEY,
@@ -45,39 +45,68 @@ public class DatabaseMigrator {
             if (applied.contains(file)) continue;
 
             log.info("Applying migration: {}", file);
-            String sql;
+
             try (var in = DatabaseMigrator.class.getResourceAsStream(MIGRATIONS_PATH + "/" + file)) {
                 if (in == null) throw new IllegalStateException("Migration not found: " + file);
 
-                sql = new String(in.readAllBytes(), StandardCharsets.UTF_8)
+                String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8)
                         .replace("\r\n", "\n")
                         .trim();
 
-                // Use JDBI Script – it handles ; separation internally
-                handle.createScript(sql).execute();
-            }
-
-            handle.execute("INSERT INTO schema_migration (version) VALUES (?)", file);
-            countApplied++;
-
-/*            // Split on ; but be careful with ; inside strings or comments – basic splitter
-            String[] statements = sql.split("(?<!\\\\);\\s*(?=\n|$)");
-            for (String stmt : statements) {
-                stmt = stmt.trim();
-                if (stmt.isEmpty() || stmt.startsWith("--") || stmt.startsWith("/*")) continue;
-                try {
-                    handle.execute(stmt);
-                } catch (Exception e) {
-                    log.error("Failed on statement:\n{}\nIn file: {}", stmt, file, e);
-                    throw e;
+                if (containsCompoundStatements(sql)) {
+                    // File contains stored procedures or compound BEGIN...END blocks.
+                    // JDBI's createScript() splits on semicolons and cannot handle these.
+                    // Execute via raw JDBC instead, statements separated by ---
+                    executeProcedureFile(handle, sql, file);
+                } else {
+                    // Plain DDL — safe to use JDBI's script executor
+                    handle.createScript(sql).execute();
                 }
             }
 
             handle.execute("INSERT INTO schema_migration (version) VALUES (?)", file);
-            countApplied++;*/
+            countApplied++;
         }
 
         log.info("Migrations finished. Newly applied: {} / total known: {}", countApplied, allFiles.size());
+    }
+
+    /**
+     * Returns true if the SQL contains compound statements (BEGIN...END blocks)
+     * that JDBI's semicolon-based script splitter cannot handle correctly.
+     */
+    private static boolean containsCompoundStatements(String sql) {
+        // Simple heuristic: presence of BEGIN (case-insensitive, whole word) indicates
+        // a stored procedure or compound statement body.
+        return sql.toUpperCase().contains("\nBEGIN") || sql.toUpperCase().startsWith("BEGIN");
+    }
+
+    /**
+     * Execute a file containing stored procedures or events via raw JDBC.
+     * Statements in the file are separated by lines containing only "---".
+     * Each statement is executed individually — no DELIMITER tricks needed.
+     */
+    private static void executeProcedureFile(Handle handle, String sql, String filename) throws Exception {
+        // Split on /*SPLIT*/ marker, then strip comment lines per statement
+        String[] statements = sql.split("/\\*SPLIT\\*/");
+
+        Connection conn = handle.getConnection();
+        for (String stmt : statements) {
+            String trimmed = stmt.trim();
+            // Remove comment lines
+            trimmed = trimmed.replaceAll("(?m)^--[^\n]*\n?", "").trim();
+            if (trimmed.isEmpty()) continue;
+
+            log.debug("Executing procedure statement from {}: {}...",
+                    filename, trimmed.substring(0, Math.min(60, trimmed.length())));
+
+            try (Statement jdbcStmt = conn.createStatement()) {
+                jdbcStmt.execute(trimmed);
+            } catch (Exception e) {
+                log.error("Failed executing statement from {}:\n{}", filename, trimmed, e);
+                throw e;
+            }
+        }
     }
 
     private static Set<String> findMigrationFiles() throws IOException, URISyntaxException {
