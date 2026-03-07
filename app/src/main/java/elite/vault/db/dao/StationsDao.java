@@ -14,8 +14,8 @@ public interface StationsDao {
 
 
     @SqlUpdate("""
-            INSERT INTO stations (systemaddress, stationid, realname, controllingfaction, controllingfactionstate, distancetoarrival, primaryeconomy, economies, government, services, haslargepad, hasmediumpad, hassmallpad, stationType)
-            VALUES (:systemAddress, :stationId, :realName, :controllingFaction, :controllingFactionState, :distanceToArrival, :primaryEconomy, :economies, :government, :services, :hasLargePad, :hasMediumPad, :hasSmallPad, :stationType)
+            INSERT INTO stations (systemaddress, marketId, realname, controllingfaction, controllingfactionstate, distancetoarrival, primaryeconomy, economies, government, services, haslargepad, hasmediumpad, hassmallpad, stationType)
+            VALUES (:systemAddress, :marketId, :realName, :controllingFaction, :controllingFactionState, :distanceToArrival, :primaryEconomy, :economies, :government, :services, :hasLargePad, :hasMediumPad, :hasSmallPad, :stationType)
             ON DUPLICATE KEY UPDATE
                 realName    = VALUES(realName),
                 controllingFaction        = VALUES(controllingFaction),
@@ -55,7 +55,7 @@ public interface StationsDao {
 
     class Station {
         private Long systemAddress;
-        private Long stationId;
+        private Long marketId;
         private String realName;
         private String stationType;
         private String controllingFaction;
@@ -77,12 +77,12 @@ public interface StationsDao {
             this.systemAddress = systemAddress;
         }
 
-        public Long getStationId() {
-            return stationId;
+        public Long getMarketId() {
+            return marketId;
         }
 
-        public void setStationId(Long stationId) {
-            this.stationId = stationId;
+        public void setMarketId(Long marketId) {
+            this.marketId = marketId;
         }
 
         public String getRealName() {

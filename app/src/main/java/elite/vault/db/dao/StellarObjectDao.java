@@ -23,15 +23,11 @@ public interface StellarObjectDao {
      * Requires UNIQUE or PRIMARY KEY on systemAddress (already present in schema).
      */
     @SqlUpdate("""
-            INSERT INTO stellar_object (bodyId, timestamp, systemAddress, x, y, z, bodyName, atmosphereType, distanceFromArrivalLs, landable, massEm, meanAnomaly, orbitalInclination, orbitalPeriod, periapsis, planetClass, radius, rotationPeriod, semiMajorAxis, surfaceGravity, surfacePressure, surfaceTemperature, terraformState, tidalLock, volcanism, eccentricity)
-              VALUES (:bodyId, :timestamp, :systemAddress, :x, :y, :z, :bodyName, :atmosphereType, :distanceFromArrivalLs, :landable, :massEm, :meanAnomaly, :orbitalInclination, :orbitalPeriod, :periapsis, :planetClass, :radius, :rotationPeriod, :semiMajorAxis, :surfaceGravity, :surfacePressure, :surfaceTemperature, :terraformState, :tidalLock, :volcanism, :eccentricity)
+            INSERT INTO stellar_object (bodyId, systemAddress, bodyName, atmosphereType, distanceFromArrivalLs, landable, massEm, meanAnomaly, orbitalInclination, orbitalPeriod, periapsis, planetClass, radius, rotationPeriod, semiMajorAxis, surfaceGravity, surfacePressure, surfaceTemperature, terraformState, tidalLock, volcanism, eccentricity)
+              VALUES (:bodyId,  :systemAddress,  :bodyName, :atmosphereType, :distanceFromArrivalLs, :landable, :massEm, :meanAnomaly, :orbitalInclination, :orbitalPeriod, :periapsis, :planetClass, :radius, :rotationPeriod, :semiMajorAxis, :surfaceGravity, :surfacePressure, :surfaceTemperature, :terraformState, :tidalLock, :volcanism, :eccentricity)
             ON DUPLICATE KEY UPDATE
                 bodyName    = VALUES(bodyName),
                 bodyId      = VALUES(bodyId),
-                timestamp   = VALUES(timestamp),
-                x           = VALUES(x),
-                y           = VALUES(y),
-                  z           = VALUES(z),
                   atmosphereType = VALUES(atmosphereType),
                   distanceFromArrivalLs = values(distanceFromArrivalLs),
                   landable = values(landable),
@@ -64,13 +60,10 @@ public interface StellarObjectDao {
         @Override
         public StellarObject map(ResultSet rs, StatementContext ctx) throws SQLException {
             StellarObject entity = new StellarObject();
-            entity.setTimestamp(rs.getString("timestamp"));
+            entity.setTimestamp(rs.getString("received_at"));
             entity.setBodyName(rs.getString("bodyName"));
             entity.setSystemAddress(rs.getLong("systemAddress"));
             entity.setBodyId(rs.getLong("bodyId"));
-            entity.setX(rs.getDouble("x"));
-            entity.setY(rs.getDouble("y"));
-            entity.setZ(rs.getDouble("z"));
 
             entity.setAtmosphereType(rs.getString("atmosphereType"));
             entity.setPlanetClass(rs.getString("planetClass"));
@@ -100,7 +93,6 @@ public interface StellarObjectDao {
         private String bodyName;
         private Long systemAddress;
         private Long bodyId;
-        private double x, y, z;
 
         private String atmosphereType;
         private String planetClass;
@@ -139,30 +131,6 @@ public interface StellarObjectDao {
 
         public void setSystemAddress(Long systemAddress) {
             this.systemAddress = systemAddress;
-        }
-
-        public double getX() {
-            return x;
-        }
-
-        public void setX(double x) {
-            this.x = x;
-        }
-
-        public double getY() {
-            return y;
-        }
-
-        public void setY(double y) {
-            this.y = y;
-        }
-
-        public double getZ() {
-            return z;
-        }
-
-        public void setZ(double z) {
-            this.z = z;
         }
 
         public Long getBodyId() {

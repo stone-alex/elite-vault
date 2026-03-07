@@ -43,13 +43,25 @@ public class TradeRouteService {
             int numTrades = ctx.queryParamAsClass("numTrades", Integer.class).getOrDefault(1);
             int maxDistanceFromEntrance = ctx.queryParamAsClass("maxDistanceFromEntrance", Integer.class).getOrDefault(6000);
             int jumpRange = ctx.queryParamAsClass("jumpRange", Integer.class).getOrDefault(6000);
+            boolean requireLargeLandingPad = ctx.queryParamAsClass("requireLargeLandingPad", Boolean.class).getOrDefault(false);
+            boolean requireMediumLandingPad = ctx.queryParamAsClass("requireMediumLandingPad", Boolean.class).getOrDefault(false);
+            boolean allowPlanetaryLandings = ctx.queryParamAsClass("allowPlanetaryLandings", Boolean.class).getOrDefault(false);
+
 
             if (startSystem == null || startSystem.isBlank()) {
                 ctx.status(400).result("startingLocationStarSystem is required");
                 return;
             }
 
-            API_TradeRouteDto route = SINGLETONS.getMarketManager().calculateTradeRoute(startSystem, numTrades, jumpRange, maxDistanceFromEntrance);
+            API_TradeRouteDto route = SINGLETONS.getMarketManager().calculateTradeRoute(
+                    startSystem,
+                    numTrades,
+                    jumpRange,
+                    maxDistanceFromEntrance,
+                    requireLargeLandingPad,
+                    requireMediumLandingPad,
+                    allowPlanetaryLandings
+            );
 
             if (route == null || route.getRoute() == null || route.getRoute().isEmpty()) {
                 ctx.status(404).result("No profitable trade routes found from " + startSystem);

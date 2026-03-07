@@ -82,7 +82,7 @@ public interface SystemDao {
 
 
     @SqlQuery("""
-            SELECT systemAddress, starName, x, y, z, date, sector
+            SELECT systemAddress, starName, x, y, z, sector
             FROM star_system
             WHERE MBRContains(
                     ST_Envelope(ST_GeomFromText(CONCAT(
@@ -103,7 +103,6 @@ public interface SystemDao {
         @Override
         public StarSystem map(ResultSet rs, StatementContext ctx) throws SQLException {
             StarSystem entity = new StarSystem();
-            entity.setDate(rs.getString("date"));
             entity.setSystemAddress(rs.getLong("systemAddress"));
             entity.setStarName(rs.getString("starName"));
             entity.setX(rs.getDouble("x"));

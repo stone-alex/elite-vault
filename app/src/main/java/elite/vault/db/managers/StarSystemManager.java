@@ -121,7 +121,7 @@ public class StarSystemManager {
         if (data.getSystemAllegiance() == null) return;
 
         Database.withDao(PowerPlayStateDao.class, dao -> {
-            dao.upsert(toPowerPlayEntity(data), data.getSystemAddress());
+            dao.upsert(toPowerPlayEntity(data));
             return Void.TYPE;
         });
 
@@ -151,6 +151,7 @@ public class StarSystemManager {
 
     private PowerPlayStateDao.PowerPlayState toPowerPlayEntity(EddnDto data) {
         PowerPlayStateDao.PowerPlayState entity = new PowerPlayStateDao.PowerPlayState();
+        entity.setSystemAddress(data.getSystemAddress());
         entity.setSystemAllegiance(data.getSystemAllegiance());
         entity.setControllingFaction(data.getSystemFaction() == null ? null : data.getSystemFaction().getName());
         entity.setControllingPower(data.getControllingPower());
@@ -163,9 +164,9 @@ public class StarSystemManager {
                         .replace("$SYSTEM_SECURITY_", "").replace(";", "")
         );
         entity.setPowerplayState(data.getPowerplayState());
-        entity.setPowerplayStateControlProgress(data.getPowerplayStateControlProgress());
-        entity.setPowerplayStateReinforcement(data.getPowerplayStateReinforcement());
-        entity.setPowerplayStateUndermining(data.getPowerplayStateUndermining());
+        entity.setControlProgress(data.getPowerplayStateControlProgress());
+        entity.setReinforcement(data.getPowerplayStateReinforcement());
+        entity.setUndermining(data.getPowerplayStateUndermining());
         return entity;
     }
 }

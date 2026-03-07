@@ -12,10 +12,10 @@ public class EDDN_CommodityItemDto {
     private Integer meanPrice;
 
     @SerializedName("buyPrice")
-    private Double buyPrice;
+    private Integer buyPrice;
 
     @SerializedName("sellPrice")
-    private Double sellPrice;
+    private Integer sellPrice;
 
     @SerializedName("stock")
     private Integer stock;
@@ -49,19 +49,19 @@ public class EDDN_CommodityItemDto {
         this.meanPrice = meanPrice;
     }
 
-    public Double getBuyPrice() {
+    public Integer getBuyPrice() {
         return buyPrice;
     }
 
-    public void setBuyPrice(Double buyPrice) {
+    public void setBuyPrice(Integer buyPrice) {
         this.buyPrice = buyPrice;
     }
 
-    public Double getSellPrice() {
+    public Integer getSellPrice() {
         return sellPrice;
     }
 
-    public void setSellPrice(Double sellPrice) {
+    public void setSellPrice(Integer sellPrice) {
         this.sellPrice = sellPrice;
     }
 

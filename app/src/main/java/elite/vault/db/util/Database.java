@@ -14,11 +14,10 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Set;
-
+import java.util.function.Function;
 
 public class Database {
     private static final Logger log = LogManager.getLogger(Database.class);
-
 
     private static final Jdbi JDBI;
     private static final ConfigManager conf = ConfigManager.getInstance();
@@ -31,10 +30,20 @@ public class Database {
                 throw new RuntimeException("Migration failed — your DB might be b0rked", e);
             }
         });
+        try (Handle h = JDBI.open()) {
+            h.execute("CALL maintain_commodity_partitions(72, 6)");
+            log.info("Commodity partitions initialized");
+        } catch (Exception e) {
+            log.warn("Partition maintenance failed at startup — commodity inserts may deadlock", e);
+        }
     }
 
-    public static <T, R> R withDao(Class<T> daoClass, java.util.function.Function<T, R> block) {
-        // Use withExtension to obtain a thread-safe handle for this specific operation
+
+    /**
+     * Standard single-DAO operation. Opens a handle, runs the block, closes the handle.
+     * Not transactional — do not use when you need DELETE + INSERT atomicity.
+     */
+    public static <T, R> R withDao(Class<T> daoClass, Function<T, R> block) {
         try {
             return JDBI.withExtension(daoClass, block::apply);
         } catch (Exception e) {
@@ -43,7 +52,35 @@ public class Database {
         }
     }
 
-    // shortcut if you just need a handle
+    /**
+     * Transactional handle operation. Opens a single connection, begins a transaction,
+     * runs the block, commits on success, rolls back on any exception.
+     * <p>
+     * Use this when you need multiple DAO operations to be atomic — e.g. the
+     * commodity snapshot replace (DELETE existing rows + bulk INSERT new rows).
+     * <p>
+     * Example:
+     * <pre>
+     *   Database.withTransaction(handle -> {
+     *       CommodityDao dao = handle.attach(CommodityDao.class);
+     *       dao.deleteByMarket(marketId);
+     *       dao.insertBatch(batch);
+     *       return null;
+     *   });
+     * </pre>
+     */
+    public static <R> R withTransaction(Function<Handle, R> block) {
+        try {
+            return JDBI.inTransaction(handle -> block.apply(handle));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Transactional operation failed", e);
+        }
+    }
+
+    /**
+     * Raw handle — caller is responsible for close(). Use sparingly.
+     */
     public static Handle init() {
         return JDBI.open();
     }
@@ -65,15 +102,15 @@ public class Database {
                             .forEach(p -> {
                                 try {
                                     String className = packageName + "." +
-                                            root.relativize(p).toString()
-                                                    .replace(FileSystems.getDefault().getSeparator(), ".")
-                                                    .replace(".class", "");
+                                                       root.relativize(p).toString()
+                                                               .replace(FileSystems.getDefault().getSeparator(), ".")
+                                                               .replace(".class", "");
                                     Class<?> clazz = Class.forName(className);
                                     if (clazz.isInterface() && clazz.getSimpleName().endsWith("Dao")) {
                                         classes.add(clazz);
                                     }
                                 } catch (ClassNotFoundException e) {
-                                    // Skip classes that can't be loaded
+                                    // skip
                                 }
                             });
                 }
@@ -90,15 +127,15 @@ public class Database {
                                 .forEach(p -> {
                                     try {
                                         String className = packageName + "." +
-                                                root.relativize(p).toString()
-                                                        .replace("/", ".")
-                                                        .replace(".class", "");
+                                                           root.relativize(p).toString()
+                                                                   .replace("/", ".")
+                                                                   .replace(".class", "");
                                         Class<?> clazz = Class.forName(className);
                                         if (clazz.isInterface() && clazz.getSimpleName().endsWith("Dao")) {
                                             classes.add(clazz);
                                         }
                                     } catch (ClassNotFoundException e) {
-                                        // Skip classes that can't be loaded
+                                        // skip
                                     }
                                 });
                     }
@@ -109,47 +146,45 @@ public class Database {
     }
 
     static {
-        String host = conf.getSystemKey(ConfigManager.DB_SERVER);     // e.g. "127.0.0.1" or "db.example.com"
-        String port = conf.getSystemKey(ConfigManager.DB_PORT);       // usually "3306"
+        String host = conf.getSystemKey(ConfigManager.DB_SERVER);
+        String port = conf.getSystemKey(ConfigManager.DB_PORT);
         String dbName = conf.getSystemKey(ConfigManager.DB_NAME);
         String user = conf.getSystemKey(ConfigManager.DB_USER);
         String pass = conf.getSystemKey(ConfigManager.DB_PASS);
 
         String jdbcUrl = String.format(
                 "jdbc:mariadb://%s:%s/%s" +
-                        "?useUnicode=true" +
-                        "&characterEncoding=UTF-8" +
-                        "&connectionAttributes=program_name:EliteVault" +
-                        "&useServerPrepStmts=true" +                  // binary protocol
-                        "&cachePrepStmts=true" +
-                        "&prepStmtCacheSize=150" +                    // memory to run on Raspberry Pi
-                        "&prepStmtCacheSqlLimit=2048" +
-                        "&rewriteBatchedStatements=true" +
-                        "&socketTimeout=30000" +                      // 30 sec to fail on long queries
-                        "&connectTimeout=10000" +                     // 10 sec timeout
-                        "&useLocalSessionState=true" +
-                        "&useLocalTransactionState=true" +            // single-thread use
-                        "&cacheResultSetMetadata=true" +              // helps repeated SELECT * FROM ...
-                        "&maintainTimeStats=false" +                  // tiny overhead reduction
-                        "&useMysqlMetadata=true" +                    // faster metadata on MariaDB
-                        "&allowPublicKeyRetrieval=true",
+                "?useUnicode=true" +
+                "&characterEncoding=UTF-8" +
+                "&connectionAttributes=program_name:EliteVault" +
+                "&useServerPrepStmts=true" +
+                "&cachePrepStmts=true" +
+                "&prepStmtCacheSize=150" +
+                "&prepStmtCacheSqlLimit=2048" +
+                "&rewriteBatchedStatements=true" +   // multi-row INSERT rewrite — critical for batch perf
+                "&socketTimeout=30000" +
+                "&connectTimeout=10000" +
+                "&useLocalSessionState=true" +
+                "&useLocalTransactionState=true" +
+                "&cacheResultSetMetadata=true" +
+                "&maintainTimeStats=false" +
+                "&useMysqlMetadata=true" +
+                "&allowPublicKeyRetrieval=true",
                 host, port, dbName
         );
 
         JDBI = Jdbi.create(jdbcUrl, user, pass)
                 .installPlugin(new SqlObjectPlugin());
 
-        // Early connection validation + log basic info
         try (var h = JDBI.open()) {
             String version = h.createQuery("SELECT VERSION()").mapTo(String.class).one();
             log.info("Connected to MariaDB version: {}", version);
         } catch (Exception e) {
             throw new RuntimeException(
                     "MariaDB connection failed. Check host/port/credentials/database existence.\n" +
-                            "URL was: " + jdbcUrl.replaceAll("(?<=password=)[^&]+", "****"), e);
+                    "URL was: " + jdbcUrl.replaceAll("(?<=password=)[^&]+", "****"), e);
         }
 
-        // Attach all DAOs from the package (unchanged logic)
         JDBI.withHandle(h -> {
             try {
                 Set<Class<?>> daoClasses = findDaoClasses("elite.vault.db.dao");

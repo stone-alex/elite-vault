@@ -29,7 +29,7 @@ public class StationManager {
             if (data.getMarketId() == null) return Void.TYPE;
             StationsDao.Station entity = new StationsDao.Station();
             entity.setDistanceToArrival(data.getDistFromStarLs());
-            entity.setStationId(data.getMarketId());
+            entity.setMarketId(data.getMarketId());
             entity.setStationType(data.getStationType());
             entity.setSystemAddress(data.getSystemAddress());
             entity.setControllingFaction(data.getStationFaction() == null ? null : data.getStationFaction().getName());

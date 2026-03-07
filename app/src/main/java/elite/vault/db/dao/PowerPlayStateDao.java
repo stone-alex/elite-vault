@@ -15,185 +15,185 @@ import java.sql.SQLException;
 public interface PowerPlayStateDao {
 
     @SqlUpdate("""
-            INSERT INTO powerplay_state (systemAddress, systemAllegiance, systemEconomy, systemSecondEconomy, 
-                                                     systemGovernment, systemSecurity, controllingFaction, powers, 
-                                                     powerplayState, controllingPower, powerplayStateControlProgress, 
-                                                     powerplayStateReinforcement, powerplayStateUndermining
+            INSERT INTO powerplay_state (
+                systemAddress, systemAllegiance, systemEconomy, systemSecondEconomy,
+                systemGovernment, systemSecurity, controllingFaction, powers,
+                powerplayState, controllingPower, controlProgress,
+                reinforcement, undermining
             )
-            VALUES (:systemAddress, :systemAllegiance, :systemEconomy, :systemSecondEconomy, :systemGovernment, 
-                                :systemSecurity, :controllingFaction, :powers, :powerplayState, :controllingPower, 
-                                :powerplayStateControlProgress, :powerplayStateReinforcement, :powerplayStateUndermining
+            VALUES (
+                :systemAddress, :systemAllegiance, :systemEconomy, :systemSecondEconomy,
+                :systemGovernment, :systemSecurity, :controllingFaction, :powers,
+                :powerplayState, :controllingPower, :controlProgress,
+                :reinforcement, :undermining
             )
             ON DUPLICATE KEY UPDATE
-                systemAllegiance                = VALUES(systemAllegiance),
-                systemEconomy                   = VALUES(systemEconomy),
-                systemSecondEconomy             = VALUES(systemSecondEconomy),
-                systemGovernment                = VALUES(systemGovernment),
-                systemSecurity                  = VALUES(systemSecurity),
-                controllingFaction              = VALUES(controllingFaction),
-                powers                          = VALUES(powers),
-                powerplayState                  = VALUES(powerplayState),
-                controllingPower                = VALUES(controllingPower),
-                powerplayStateControlProgress   = VALUES(powerplayStateControlProgress),
-                powerplayStateReinforcement     = VALUES(powerplayStateReinforcement),
-                powerplayStateUndermining       = VALUES(powerplayStateUndermining)
+                systemAllegiance    = VALUES(systemAllegiance),
+                systemEconomy       = VALUES(systemEconomy),
+                systemSecondEconomy = VALUES(systemSecondEconomy),
+                systemGovernment    = VALUES(systemGovernment),
+                systemSecurity      = VALUES(systemSecurity),
+                controllingFaction  = VALUES(controllingFaction),
+                powers              = VALUES(powers),
+                powerplayState      = VALUES(powerplayState),
+                controllingPower    = VALUES(controllingPower),
+                controlProgress     = VALUES(controlProgress),
+                reinforcement       = VALUES(reinforcement),
+                undermining         = VALUES(undermining)
             """)
-    void upsert(@BindBean PowerPlayStateDao.PowerPlayState data, @Bind Long systemAddress);
-
+    void upsert(@BindBean PowerPlayState data);
 
     @SqlQuery("""
-            select * from powerplay_state where systemAddress = :systemAddress
+            SELECT
+                systemAddress, systemAllegiance, systemEconomy, systemSecondEconomy,
+                systemGovernment, systemSecurity, controllingFaction, powers,
+                powerplayState, controllingPower, controlProgress,
+                reinforcement, undermining
+            FROM powerplay_state
+            WHERE systemAddress = :systemAddress
             """)
-    PowerPlayStateDao.PowerPlayState getPowerState(@Bind Long systemAddress);
+    PowerPlayState getPowerState(@Bind("systemAddress") long systemAddress);
 
 
     class PowerPlayStateMapper implements RowMapper<PowerPlayState> {
 
-        @Override public PowerPlayState map(ResultSet rs, StatementContext ctx) throws SQLException {
-            PowerPlayState entity = new PowerPlayState();
-            entity.setSystemAddress(rs.getLong("systemAddress"));
-            entity.setSystemAllegiance(rs.getString("systemAllegiance"));
-            entity.setSystemEconomy(rs.getString("systemEconomy"));
-            entity.setSystemSecondEconomy(rs.getString("systemSecondEconomy"));
-            entity.setSystemGovernment(rs.getString("systemGovernment"));
-            entity.setSystemSecurity(rs.getString("systemSecurity"));
-            entity.setControllingPower(rs.getString("controllingPower"));
-            entity.setControllingFaction(rs.getString("controllingFaction"));
-            entity.setPowerplayState(rs.getString("powerplayState"));
-            entity.setPowerplayStateControlProgress(rs.getDouble("powerplayStateControlProgress"));
-            entity.setPowerplayStateReinforcement(rs.getInt("powerplayStateReinforcement"));
-            entity.setPowerplayStateUndermining(rs.getInt("powerplayStateUndermining"));
-            return entity;
+        @Override
+        public PowerPlayState map(ResultSet rs, StatementContext ctx) throws SQLException {
+            PowerPlayState e = new PowerPlayState();
+            e.setSystemAddress(rs.getLong("systemAddress"));
+            e.setSystemAllegiance(rs.getString("systemAllegiance"));
+            e.setSystemEconomy(rs.getString("systemEconomy"));
+            e.setSystemSecondEconomy(rs.getString("systemSecondEconomy"));
+            e.setSystemGovernment(rs.getString("systemGovernment"));
+            e.setSystemSecurity(rs.getString("systemSecurity"));
+            e.setControllingFaction(rs.getString("controllingFaction"));
+            e.setPowers(rs.getString("powers"));
+            e.setPowerplayState(rs.getString("powerplayState"));
+            e.setControllingPower(rs.getString("controllingPower"));
+            e.setControlProgress(rs.getDouble("controlProgress"));
+            e.setReinforcement(rs.getInt("reinforcement"));
+            e.setUndermining(rs.getInt("undermining"));
+            return e;
         }
     }
 
     class PowerPlayState {
         private Long systemAddress;
         private String systemAllegiance;
-        private String systemEconomy;// $economy_Extraction;
-        private String systemSecondEconomy; // $economy_HighTech;
-        private String systemGovernment; // $government_Democracy;
-        private String systemSecurity;//  $SYSTEM_SECURITY_low;
-        private String systemFaction;
-        private String powers; // this | that
+        private String systemEconomy;
+        private String systemSecondEconomy;
+        private String systemGovernment;
+        private String systemSecurity;
+        private String controllingFaction;
+        private String powers;
         private String powerplayState;
         private String controllingPower;
-        private String controllingFaction;
-        private Double powerplayStateControlProgress;
-        private Integer powerplayStateReinforcement;
-        private Integer powerplayStateUndermining;
-
+        private Double controlProgress;
+        private Integer reinforcement;
+        private Integer undermining;
 
         public Long getSystemAddress() {
             return systemAddress;
         }
 
-        public void setSystemAddress(Long systemAddress) {
-            this.systemAddress = systemAddress;
+        public void setSystemAddress(Long v) {
+            this.systemAddress = v;
         }
 
         public String getSystemAllegiance() {
             return systemAllegiance;
         }
 
-        public void setSystemAllegiance(String systemAllegiance) {
-            this.systemAllegiance = systemAllegiance;
+        public void setSystemAllegiance(String v) {
+            this.systemAllegiance = v;
         }
 
         public String getSystemEconomy() {
             return systemEconomy;
         }
 
-        public void setSystemEconomy(String systemEconomy) {
-            this.systemEconomy = systemEconomy;
+        public void setSystemEconomy(String v) {
+            this.systemEconomy = v;
         }
 
         public String getSystemSecondEconomy() {
             return systemSecondEconomy;
         }
 
-        public void setSystemSecondEconomy(String systemSecondEconomy) {
-            this.systemSecondEconomy = systemSecondEconomy;
+        public void setSystemSecondEconomy(String v) {
+            this.systemSecondEconomy = v;
         }
 
         public String getSystemGovernment() {
             return systemGovernment;
         }
 
-        public void setSystemGovernment(String systemGovernment) {
-            this.systemGovernment = systemGovernment;
+        public void setSystemGovernment(String v) {
+            this.systemGovernment = v;
         }
 
         public String getSystemSecurity() {
             return systemSecurity;
         }
 
-        public void setSystemSecurity(String systemSecurity) {
-            this.systemSecurity = systemSecurity;
-        }
-
-        public String getSystemFaction() {
-            return systemFaction;
-        }
-
-        public void setSystemFaction(String systemFaction) {
-            this.systemFaction = systemFaction;
-        }
-
-        public String getPowers() {
-            return powers;
-        }
-
-        public void setPowers(String powers) {
-            this.powers = powers;
-        }
-
-        public String getPowerplayState() {
-            return powerplayState;
-        }
-
-        public void setPowerplayState(String powerplayState) {
-            this.powerplayState = powerplayState;
-        }
-
-        public String getControllingPower() {
-            return controllingPower;
-        }
-
-        public void setControllingPower(String controllingPower) {
-            this.controllingPower = controllingPower;
-        }
-
-        public Double getPowerplayStateControlProgress() {
-            return powerplayStateControlProgress;
-        }
-
-        public void setPowerplayStateControlProgress(Double powerplayStateControlProgress) {
-            this.powerplayStateControlProgress = powerplayStateControlProgress;
-        }
-
-        public Integer getPowerplayStateReinforcement() {
-            return powerplayStateReinforcement;
-        }
-
-        public void setPowerplayStateReinforcement(Integer powerplayStateReinforcement) {
-            this.powerplayStateReinforcement = powerplayStateReinforcement;
-        }
-
-        public Integer getPowerplayStateUndermining() {
-            return powerplayStateUndermining;
-        }
-
-        public void setPowerplayStateUndermining(Integer powerplayStateUndermining) {
-            this.powerplayStateUndermining = powerplayStateUndermining;
+        public void setSystemSecurity(String v) {
+            this.systemSecurity = v;
         }
 
         public String getControllingFaction() {
             return controllingFaction;
         }
 
-        public void setControllingFaction(String controllingFaction) {
-            this.controllingFaction = controllingFaction;
+        public void setControllingFaction(String v) {
+            this.controllingFaction = v;
+        }
+
+        public String getPowers() {
+            return powers;
+        }
+
+        public void setPowers(String v) {
+            this.powers = v;
+        }
+
+        public String getPowerplayState() {
+            return powerplayState;
+        }
+
+        public void setPowerplayState(String v) {
+            this.powerplayState = v;
+        }
+
+        public String getControllingPower() {
+            return controllingPower;
+        }
+
+        public void setControllingPower(String v) {
+            this.controllingPower = v;
+        }
+
+        public Double getControlProgress() {
+            return controlProgress;
+        }
+
+        public void setControlProgress(Double v) {
+            this.controlProgress = v;
+        }
+
+        public Integer getReinforcement() {
+            return reinforcement;
+        }
+
+        public void setReinforcement(Integer v) {
+            this.reinforcement = v;
+        }
+
+        public Integer getUndermining() {
+            return undermining;
+        }
+
+        public void setUndermining(Integer v) {
+            this.undermining = v;
         }
     }
 }

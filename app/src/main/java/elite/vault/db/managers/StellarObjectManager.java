@@ -71,7 +71,6 @@ public class StellarObjectManager {
                 entity.setPercent(m.getPercent());
                 entity.setSystemAddress(systemAddress);
                 entity.setBodyId(bodyId);
-                entity.setBodyName(bodyName);
                 dao.upsert(entity);
                 return Void.TYPE;
             });
@@ -84,9 +83,6 @@ public class StellarObjectManager {
         data.setBodyId(dto.getBodyId());
         data.setBodyName(dto.getBodyName() == null ? dto.getBody() : dto.getBodyName());
         data.setSystemAddress(dto.getSystemAddress());
-        data.setX(dto.getStarPos().get(0));
-        data.setY(dto.getStarPos().get(1));
-        data.setZ(dto.getStarPos().get(2));
         data.setAtmosphereType(dto.getAtmosphereType());
         data.setDistanceFromArrivalLs(dto.getDistanceFromArrivalLs());
         data.setEccentricity(dto.getEccentricity());
@@ -115,9 +111,6 @@ public class StellarObjectManager {
         data.setBodyId(dto.getBodyId());
         data.setBodyName(dto.getBodyName());
         data.setSystemAddress(dto.getSystemAddress());
-        data.setX(x);
-        data.setY(y);
-        data.setZ(z);
         data.setAtmosphereType(dto.getAtmosphereType());
         data.setDistanceFromArrivalLs(dto.getDistanceToArrival());
         //data.setEccentricity
@@ -166,7 +159,7 @@ public class StellarObjectManager {
         for (BootstrapEntryDto.Station station : stations) {
             Database.withDao(StationsDao.class, dao -> {
                 StationsDao.Station entity = new StationsDao.Station();
-                entity.setStationId(station.getId());
+                entity.setMarketId(station.getId());
                 entity.setSystemAddress(systemAddress);
                 entity.setControllingFaction(station.getControllingFaction());
                 entity.setControllingFactionState(station.getControllingFactionState());

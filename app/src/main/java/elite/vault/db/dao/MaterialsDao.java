@@ -13,8 +13,8 @@ import java.sql.SQLException;
 public interface MaterialsDao {
 
     @SqlUpdate("""
-            INSERT INTO materials (systemAddress, bodyId, bodyName, materialName, percent)
-            VALUES (:systemAddress, :bodyId, :bodyName, :materialName, :percent)
+            INSERT INTO materials (systemAddress, bodyId, materialName, percent)
+            VALUES (:systemAddress, :bodyId, :materialName, :percent)
             ON DUPLICATE KEY UPDATE
                 materialName = VALUES(materialName),
                 percent      = VALUES(percent)
@@ -27,7 +27,6 @@ public interface MaterialsDao {
             Material entity = new Material();
             entity.setSystemAddress(rs.getLong("systemAddress"));
             entity.setBodyId(rs.getLong("bodyId"));
-            entity.setBodyName(rs.getString("bodyName"));
             entity.setMaterialName(rs.getString("materialName"));
             entity.setPercent(rs.getDouble("percent"));
             return entity;
@@ -37,7 +36,6 @@ public interface MaterialsDao {
     class Material {
         private Long systemAddress;
         private Long bodyId;
-        private String bodyName;
         private String materialName;
         private Double percent;
 
@@ -55,14 +53,6 @@ public interface MaterialsDao {
 
         public void setBodyId(Long bodyId) {
             this.bodyId = bodyId;
-        }
-
-        public String getBodyName() {
-            return bodyName;
-        }
-
-        public void setBodyName(String bodyName) {
-            this.bodyName = bodyName;
         }
 
         public String getMaterialName() {
