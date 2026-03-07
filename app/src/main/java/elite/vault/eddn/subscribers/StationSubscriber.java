@@ -22,7 +22,7 @@ public class StationSubscriber {
     }
 
     private void update(EddnMessageEvent event) {
-        log.info("EDDM Station " + event.getEventType());
+        log.info("EDDN Station " + event.getEventType());
         manager.saveStations(event.getData());
     }
 }

@@ -30,7 +30,7 @@ public class StellarObjectSubscriber {
         ///  save star
         if (data.getStarPos() != null && data.getStarSystem() != null) {
             SINGLETONS.getStarSystemManager().save(data);
-            log.info("EDDM Star System " + data.getStarSystem());
+            log.info("EDDN Star System " + data.getStarSystem());
         }
 
         /// save stellar object
@@ -38,7 +38,7 @@ public class StellarObjectSubscriber {
             if (data.getScanType().equalsIgnoreCase("Detailed")) {
                 /// save detailed
                 SINGLETONS.getStellarObjectManager().save(data);
-                log.info("EDDM Stellar Object " + data.getStarSystem());
+                log.info("EDDN Stellar Object " + data.getStarSystem());
             } else {
                 SINGLETONS.getStellarObjectManager().savePartial(data);
             }

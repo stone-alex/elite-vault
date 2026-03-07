@@ -21,7 +21,7 @@ public class FsdJumpSubscriber {
     }
 
     private static void update(EddnMessageEvent event) {
-        log.info("EDDM FsdJump " + event.getEventType());
+        log.info("EDDN FsdJump " + event.getEventType());
         EddnDto data = event.getData();
         SINGLETONS.getStarSystemManager().saveFsdJump(data);
     }
