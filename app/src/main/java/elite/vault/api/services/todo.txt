@@ -1,0 +1,4 @@
+API to return
+    planet classes
+    commodity types
+    check of commodity is prohibited in the star system

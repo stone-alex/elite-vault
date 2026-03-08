@@ -27,6 +27,10 @@ public class StationManager {
 
         Database.withDao(StationsDao.class, dao -> {
             if (data.getMarketId() == null) return Void.TYPE;
+            if (data.getLandingPads() == null) return Void.TYPE;
+            if (data.getDistFromStarLs() == null) return Void.TYPE;
+            if (data.getSystemAddress() == null) return Void.TYPE;
+
             StationsDao.Station entity = new StationsDao.Station();
             entity.setDistanceToArrival(data.getDistFromStarLs());
             entity.setMarketId(data.getMarketId());
