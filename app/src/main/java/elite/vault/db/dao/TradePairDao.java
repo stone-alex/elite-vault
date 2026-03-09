@@ -2,6 +2,7 @@ package elite.vault.db.dao;
 
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
+import org.jdbi.v3.sqlobject.customizer.Define;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 
 import java.time.LocalDateTime;
@@ -25,38 +26,28 @@ public interface TradePairDao {
             """)
     LocalDateTime getLastCalculatedAt();
 
-    @SqlQuery("""
-            SELECT status
-            FROM   trade_pair_meta
-            WHERE  id = 1
-            """)
-    String getStatus();
-
 
     // -------------------------------------------------------------------------
-    // Route queries
+    // Route hop query
+    //
+    // Finds the top N best trade pairs reachable from the current position.
+    // Called once per hop in MarketManager.calculateTradeRoute.
+    //
+    // Index usage:
+    //   idx_tp_buy_xyz     - bounding box on buyX/Y/Z prunes the candidate set
+    //   idx_tp_buy_sys_profit - tiebreak / sort support
+    //   idx_tp_large_pad / idx_tp_medium_pad - pad filter support
+    //
+    // <planetaryTypes> is injected via @Define - JDBI defineList turns it into
+    // a quoted IN-clause at query-build time (not a bind parameter), which is
+    // required because MariaDB does not support binding a list as an IN value.
+    //
+    // runValue = profitPerUnit * LEAST(buyStock, sellDemand, cargoCap)
+    //   - proxy for "how much money does one full cargo run make?"
+    //   - used for ORDER BY so we favour high-volume low-margin pairs over
+    //     high-margin low-stock pairs when they yield more total profit.
     // -------------------------------------------------------------------------
 
-    /**
-     * Find the best trade pairs buyable from a given system (or within jump
-     * range of it).
-     * <p>
-     * Filters applied:
-     * - buy system within jumpRange of the reference point (3D bounding cube
-     * + exact sphere - buyX/Y/Z indexes make the cube cheap)
-     * - distanceLy <= jumpRange  (buy→sell leg fits in one jump sequence)
-     * - station distance from system entry point
-     * - pad size (large required → buyHasLargePad AND sellHasLargePad;
-     * medium required → (large OR medium) on both sides)
-     * - planetary station type exclusion on both buy and sell sides
-     * <p>
-     * Ranked by: profitPerUnit × min(buyStock, sellDemand, cargoCap) DESC
-     * so high-volume runs rank above small-stock outliers.
-     * <p>
-     * Note: the planetary type IN-clause (<planetaryTypes>) must be injected
-     * via handle.define() - see MarketManager. Same pattern as before.
-     */
-    @RegisterBeanMapper(TradePairRow.class)
     @SqlQuery("""
             SELECT
                 tp.commodityId,
@@ -91,53 +82,77 @@ public interface TradePairDao {
                 tp.distanceLy,
                 tp.profitPerUnit * LEAST(tp.buyStock, tp.sellDemand, :cargoCap) AS runValue
             FROM trade_pair tp
-            WHERE tp.distanceLy              <= :jumpRange
-              AND tp.buyDistToArrival        <= :maxDistFromEntrance
-              AND tp.sellDistToArrival       <= :maxDistFromEntrance
-              AND tp.profitPerUnit            > 0
-              AND tp.buyStock                >= GREATEST(:cargoCap / 2, 10)
-              AND tp.sellDemand              >= GREATEST(:cargoCap / 2, 10)
-              AND (
-                  :requireLargePad = FALSE
-                  OR (tp.buyHasLargePad = TRUE AND tp.sellHasLargePad = TRUE)
-              )
-              AND (
-                  :requireMediumPad = FALSE
-                  OR ((tp.buyHasLargePad = TRUE  OR tp.buyHasMediumPad = TRUE)
-                  AND (tp.sellHasLargePad = TRUE OR tp.sellHasMediumPad = TRUE))
-              )
-              AND (
-                  :allowPlanetary = TRUE
-                  OR tp.buyStationType  NOT IN (<planetaryTypes>)
-              )
-              AND (
-                  :allowPlanetary = TRUE
-                  OR tp.sellStationType NOT IN (<planetaryTypes>)
-              )
-              AND tp.buyX BETWEEN :refX - :jumpRange AND :refX + :jumpRange
-              AND tp.buyY BETWEEN :refY - :jumpRange AND :refY + :jumpRange
-              AND tp.buyZ BETWEEN :refZ - :jumpRange AND :refZ + :jumpRange
-              AND POW(tp.buyX - :refX, 2) + POW(tp.buyY - :refY, 2) + POW(tp.buyZ - :refZ, 2)
-                      <= POW(:jumpRange, 2)
-            ORDER BY runValue DESC
+            WHERE
+                -- Distance to arrival filter (both ends)
+                tp.buyDistToArrival  <= :maxDistFromEntrance
+                AND tp.sellDistToArrival <= :maxDistFromEntrance
+                -- Must be profitable
+                AND tp.profitPerUnit > 0
+                -- Enough supply and demand to fill at least half a hold
+                AND tp.buyStock  >= GREATEST(:cargoCap / 2, 10)
+                AND tp.sellDemand >= GREATEST(:cargoCap / 2, 10)
+                -- Pad size filter:
+                --   requireLargePad  → both stations must have a large pad
+                --   requireMediumPad → both stations must have large OR medium
+                --   neither          → no pad restriction
+                AND (
+                    :requireLargePad = FALSE
+                    OR (tp.buyHasLargePad = TRUE AND tp.sellHasLargePad = TRUE)
+                )
+                AND (
+                    :requireMediumPad = FALSE
+                    OR (
+                        (tp.buyHasLargePad  = TRUE OR tp.buyHasMediumPad  = TRUE)
+                        AND
+                        (tp.sellHasLargePad = TRUE OR tp.sellHasMediumPad = TRUE)
+                    )
+                )
+                -- Planetary landing filter: exclude surface/settlement types unless allowed
+                AND (
+                    :allowPlanetary = TRUE
+                    OR tp.buyStationType  NOT IN (<planetaryTypes>)
+                )
+                AND (
+                    :allowPlanetary = TRUE
+                    OR tp.sellStationType NOT IN (<planetaryTypes>)
+                )
+                -- Reachability: buy station must be within jumpRange of current position.
+                -- Bounding cube first (hits idx_tp_buy_xyz), exact sphere check second.
+                AND tp.buyX BETWEEN :refX - :jumpRange AND :refX + :jumpRange
+                AND tp.buyY BETWEEN :refY - :jumpRange AND :refY + :jumpRange
+                AND tp.buyZ BETWEEN :refZ - :jumpRange AND :refZ + :jumpRange
+                AND POW(tp.buyX - :refX, 2) + POW(tp.buyY - :refY, 2) + POW(tp.buyZ - :refZ, 2)
+                    <= POW(:jumpRange, 2)
+            ORDER BY
+                tp.profitPerUnit * LEAST(tp.buyStock, tp.sellDemand, :cargoCap) DESC
             LIMIT :limit
             """)
-    List<TradePairRow> findBestPairsNear(
+    @RegisterBeanMapper(TradePairRow.class)
+    List<TradePairRow> findBestHop(
+            // Current position (hop 1 = player system, hop N = previous sell system)
             @Bind("refX") double refX,
             @Bind("refY") double refY,
             @Bind("refZ") double refZ,
+            // How far the player is willing to travel to reach the buy station
             @Bind("jumpRange") double jumpRange,
+            // Station distance-to-arrival cap (light seconds)
             @Bind("maxDistFromEntrance") double maxDistFromEntrance,
+            // Cargo capacity - used for runValue calculation and stock/demand threshold
+            @Bind("cargoCap") int cargoCap,
+            // Pad and environment filters
             @Bind("requireLargePad") boolean requireLargePad,
             @Bind("requireMediumPad") boolean requireMediumPad,
             @Bind("allowPlanetary") boolean allowPlanetary,
-            @Bind("cargoCap") int cargoCap,
+            // Injected IN-clause, e.g. 'SurfaceStation','CraterPort',...
+            @Define("planetaryTypes") String planetaryTypes,
+            // How many candidates to return (caller picks best unused one)
             @Bind("limit") int limit
     );
 
 
     // -------------------------------------------------------------------------
-    // Supporting type - maps directly from the trade_pair table columns
+    // Supporting type - maps directly from the trade_pair table columns.
+    // runValue is a computed column alias, not stored in the table.
     // -------------------------------------------------------------------------
 
     class TradePairRow {

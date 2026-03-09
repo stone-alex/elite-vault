@@ -1,9 +1,12 @@
 package elite.vault.db.dao;
 
+import elite.vault.db.projections.BuyCandidateProjection;
 import elite.vault.db.projections.CommodityOfferProjection;
+import elite.vault.db.projections.SellCandidateProjection;
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.Define;
 import org.jdbi.v3.sqlobject.statement.SqlBatch;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -15,10 +18,6 @@ public interface CommodityDao {
 
     // -------------------------------------------------------------------------
     // Planetary station type classification
-    //
-    // Used by the allowPlanetary filter in all trade queries.
-    // Add new types here as they are discovered in EDDN data.
-    // Kept as a constant so it is easy to update in one place.
     // -------------------------------------------------------------------------
 
     Set<String> PLANETARY_STATION_TYPES = Set.of(
@@ -38,24 +37,13 @@ public interface CommodityDao {
     // Commodity type cache support
     // -------------------------------------------------------------------------
 
-    /**
-     * Load all known commodity types into a name→id map on startup.
-     * Returns empty list on a blank DB - that is normal.
-     */
     @SqlQuery("SELECT name, id FROM commodity_type")
     @RegisterBeanMapper(CommodityTypeRow.class)
     List<CommodityTypeRow> loadAllCommodityTypes();
 
-    /**
-     * Insert a new commodity type name if it does not already exist.
-     * INSERT IGNORE means no error on race/duplicate.
-     */
     @SqlUpdate("INSERT IGNORE INTO commodity_type (name) VALUES (:name)")
     void insertCommodityTypeIfAbsent(@Bind("name") String name);
 
-    /**
-     * Fetch the id for a commodity name. Called once after insertIfAbsent on a cache miss.
-     */
     @SqlQuery("SELECT id FROM commodity_type WHERE name = :name")
     Short findCommodityTypeId(@Bind("name") String name);
 
@@ -64,18 +52,9 @@ public interface CommodityDao {
     // Snapshot replace
     // -------------------------------------------------------------------------
 
-    /**
-     * Delete all commodity rows for a market. Step 1 of the snapshot replace.
-     * Hits idx_c_market - single partition scan.
-     */
     @SqlUpdate("DELETE FROM commodity WHERE marketId = :marketId")
     void deleteByMarket(@Bind("marketId") long marketId);
 
-    /**
-     * Bulk insert the new commodity snapshot. Step 2 of the snapshot replace.
-     * rewriteBatchedStatements=true in the JDBC URL turns this into a single
-     * multi-row INSERT on the wire.
-     */
     @SqlBatch("""
             INSERT INTO commodity (marketId, commodityId, systemAddress, buyPrice, sellPrice, stock, demand, received_at)
             VALUES (:marketId, :commodityId, :systemAddress, :buyPrice, :sellPrice, :stock, :demand, UNIX_TIMESTAMP())
@@ -84,42 +63,36 @@ public interface CommodityDao {
 
 
     // -------------------------------------------------------------------------
-    // Trade queries
+    // Commodity search (used by CommoditiesService)
+    //
+    // Bounding box on stations.x/y/z (idx_st_xyz) — no star_system join.
     // -------------------------------------------------------------------------
 
-    /**
-     * Find the best places to sell a specific commodity near a reference point.
-     * <p>
-     * Distance is 3D: bounding cube on indexed x/y/z columns for the initial
-     * candidate set, then exact sqrt distance for the final filter and sort.
-     * The 2D spatial index (pos) is intentionally NOT used here - it only stores
-     * X and Y and would silently under-filter in a 3D galaxy.
-     */
-    @RegisterBeanMapper(CommodityOfferProjection.class)
     @SqlQuery("""
             SELECT
-                ss.starName                                                                          AS starName,
-                st.realName                                                                          AS stationName,
-                ct.name                                                                              AS commodity,
-                c.sellPrice                                                                          AS sellPrice,
-                c.stock                                                                              AS stock,
-                ROUND(SQRT(POW(ss.x - :refX, 2) + POW(ss.y - :refY, 2) + POW(ss.z - :refZ, 2)), 1)   AS distanceLy,
-                c.marketId                                                                           AS marketId,
-                c.systemAddress                                                                      AS systemAddress
-            FROM commodity c
-            INNER JOIN commodity_type ct ON ct.id             = c.commodityId
-            INNER JOIN star_system     ss ON ss.systemAddress  = c.systemAddress
-            INNER JOIN stations        st ON st.marketId       = c.marketId
-            WHERE c.commodityId = :commodityId
-              AND c.stock       > 0
-              AND c.sellPrice   > 0
-              AND ss.x BETWEEN :refX - :maxLy AND :refX + :maxLy
-              AND ss.y BETWEEN :refY - :maxLy AND :refY + :maxLy
-              AND ss.z BETWEEN :refZ - :maxLy AND :refZ + :maxLy
-              AND POW(ss.x - :refX, 2) + POW(ss.y - :refY, 2) + POW(ss.z - :refZ, 2) <= POW(:maxLy, 2)
+                st.realName                                                                              AS stationName,
+                ct.name                                                                                  AS commodity,
+                c.sellPrice                                                                              AS sellPrice,
+                c.stock                                                                                  AS stock,
+                ROUND(SQRT(POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)), 1)    AS distanceLy,
+                c.marketId                                                                               AS marketId,
+                c.systemAddress                                                                          AS systemAddress
+            FROM stations st
+            INNER JOIN commodity      c  ON c.marketId    = st.marketId
+                                        AND c.commodityId = :commodityId
+                                        AND c.stock       > 0
+                                        AND c.sellPrice   > 0
+            INNER JOIN commodity_type ct ON ct.id         = c.commodityId
+            WHERE
+                st.x BETWEEN :refX - :maxLy AND :refX + :maxLy
+                AND st.y BETWEEN :refY - :maxLy AND :refY + :maxLy
+                AND st.z BETWEEN :refZ - :maxLy AND :refZ + :maxLy
+                AND POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2) <= POW(:maxLy, 2)
+                AND st.stationType != 'FleetCarrier'
             ORDER BY c.sellPrice DESC, c.stock DESC
-            LIMIT 20
+            LIMIT 1
             """)
+    @RegisterBeanMapper(CommodityOfferProjection.class)
     List<CommodityOfferProjection> findBestCommodityOffers(
             @Bind("commodityId") short commodityId,
             @Bind("maxLy") double maxLy,
@@ -130,12 +103,149 @@ public interface CommodityDao {
 
 
     // -------------------------------------------------------------------------
+    // Route hop query — step 1: find buy candidates
+    //
+    // Bounding box on stations.x/y/z (idx_st_xyz) prunes to stations within
+    // hopDistance. No star_system join — coordinates live on stations directly.
+    // stations(~14k) is far smaller than star_system(763k) so the scan is tiny.
+    // -------------------------------------------------------------------------
+
+    @SqlQuery("""
+            SELECT
+                c.commodityId                                                                           AS commodityId,
+                ct.name                                                                                 AS commodityName,
+                c.marketId                                                                              AS buyMarketId,
+                c.systemAddress                                                                         AS buySystemAddress,
+                st.realName                                                                             AS buyStation,
+                c.buyPrice                                                                              AS buyPrice,
+                c.stock                                                                                 AS buyStock,
+                st.x                                                                                    AS buyX,
+                st.y                                                                                    AS buyY,
+                st.z                                                                                    AS buyZ,
+                st.hasLargePad                                                                          AS buyHasLargePad,
+                st.hasMediumPad                                                                         AS buyHasMediumPad,
+                st.stationType                                                                          AS buyStationType,
+                st.distanceToArrival                                                                    AS buyDistToArrival,
+                ROUND(SQRT(POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)), 2)   AS distanceFromRef
+            FROM stations st
+            INNER JOIN commodity      c  ON c.marketId  = st.marketId
+                                        AND c.buyPrice  > 0
+                                        AND c.stock    >= :minStock
+            INNER JOIN commodity_type ct ON ct.id       = c.commodityId
+            WHERE
+                st.x BETWEEN :refX - :hopDistance AND :refX + :hopDistance
+                AND st.y BETWEEN :refY - :hopDistance AND :refY + :hopDistance
+                AND st.z BETWEEN :refZ - :hopDistance AND :refZ + :hopDistance
+                AND POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)
+                    <= POW(:hopDistance, 2)
+                AND st.distanceToArrival <= :maxDistToArrival
+                AND (
+                    :requireLargePad = FALSE
+                    OR st.hasLargePad = TRUE
+                )
+                AND (
+                    :requireMediumPad = FALSE
+                    OR st.hasLargePad = TRUE
+                    OR st.hasMediumPad = TRUE
+                )
+                AND (
+                    :allowPlanetary = TRUE
+                    OR st.stationType NOT IN (<planetaryTypes>)
+                )
+                AND st.stationType != 'FleetCarrier'
+            ORDER BY c.buyPrice ASC
+            LIMIT :limit
+            """)
+    @RegisterBeanMapper(BuyCandidateProjection.class)
+    List<BuyCandidateProjection> findBuyCandidates(
+            @Bind("refX") double refX,
+            @Bind("refY") double refY,
+            @Bind("refZ") double refZ,
+            @Bind("hopDistance") double hopDistance,
+            @Bind("minStock") int minStock,
+            @Bind("maxDistToArrival") double maxDistToArrival,
+            @Bind("requireLargePad") boolean requireLargePad,
+            @Bind("requireMediumPad") boolean requireMediumPad,
+            @Bind("allowPlanetary") boolean allowPlanetary,
+            @Define("planetaryTypes") String planetaryTypes,
+            @Bind("limit") int limit
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Route hop query — step 2: find best sell destination
+    //
+    // Same pattern — bounding box on stations.x/y/z around the buy station.
+    // No star_system join needed.
+    // -------------------------------------------------------------------------
+
+    @SqlQuery("""
+            SELECT
+                c.marketId                                                                                  AS sellMarketId,
+                c.systemAddress                                                                             AS sellSystemAddress,
+                st.realName                                                                                 AS sellStation,
+                c.sellPrice                                                                                 AS sellPrice,
+                c.demand                                                                                    AS sellDemand,
+                st.x                                                                                        AS sellX,
+                st.y                                                                                        AS sellY,
+                st.z                                                                                        AS sellZ,
+                st.hasLargePad                                                                              AS sellHasLargePad,
+                st.hasMediumPad                                                                             AS sellHasMediumPad,
+                st.stationType                                                                              AS sellStationType,
+                st.distanceToArrival                                                                        AS sellDistToArrival,
+                ROUND(SQRT(POW(st.x - :buyX, 2) + POW(st.y - :buyY, 2) + POW(st.z - :buyZ, 2)), 2)        AS distanceFromBuy
+            FROM stations st
+            INNER JOIN commodity c ON c.marketId    = st.marketId
+                                  AND c.commodityId = :commodityId
+                                  AND c.sellPrice   > :buyPrice
+                                  AND c.demand     >= :minDemand
+                                  AND c.marketId   != :buyMarketId
+            WHERE
+                st.x BETWEEN :buyX - :hopDistance AND :buyX + :hopDistance
+                AND st.y BETWEEN :buyY - :hopDistance AND :buyY + :hopDistance
+                AND st.z BETWEEN :buyZ - :hopDistance AND :buyZ + :hopDistance
+                AND POW(st.x - :buyX, 2) + POW(st.y - :buyY, 2) + POW(st.z - :buyZ, 2)
+                    <= POW(:hopDistance, 2)
+                AND st.distanceToArrival <= :maxDistToArrival
+                AND (
+                    :requireLargePad = FALSE
+                    OR st.hasLargePad = TRUE
+                )
+                AND (
+                    :requireMediumPad = FALSE
+                    OR st.hasLargePad = TRUE
+                    OR st.hasMediumPad = TRUE
+                )
+                AND (
+                    :allowPlanetary = TRUE
+                    OR st.stationType NOT IN (<planetaryTypes>)
+                )
+                AND st.stationType != 'FleetCarrier'
+            ORDER BY c.sellPrice DESC
+            LIMIT 1
+            """)
+    @RegisterBeanMapper(SellCandidateProjection.class)
+    SellCandidateProjection findBestSell(
+            @Bind("commodityId") short commodityId,
+            @Bind("buyMarketId") long buyMarketId,
+            @Bind("buyPrice") int buyPrice,
+            @Bind("buyX") double buyX,
+            @Bind("buyY") double buyY,
+            @Bind("buyZ") double buyZ,
+            @Bind("hopDistance") double hopDistance,
+            @Bind("minDemand") int minDemand,
+            @Bind("maxDistToArrival") double maxDistToArrival,
+            @Bind("requireLargePad") boolean requireLargePad,
+            @Bind("requireMediumPad") boolean requireMediumPad,
+            @Bind("allowPlanetary") boolean allowPlanetary,
+            @Define("planetaryTypes") String planetaryTypes
+    );
+
+
+    // -------------------------------------------------------------------------
     // Supporting types
     // -------------------------------------------------------------------------
 
-    /**
-     * Used for loading the commodity_type cache on startup.
-     */
     class CommodityTypeRow {
         private String name;
         private short id;
@@ -157,11 +267,6 @@ public interface CommodityDao {
         }
     }
 
-    /**
-     * One row to be inserted into the commodity table.
-     * Prices/stock/demand use int - Elite credits are whole numbers,
-     * and INT UNSIGNED in the schema covers the full range.
-     */
     class CommodityRow {
         private long marketId;
         private short commodityId;

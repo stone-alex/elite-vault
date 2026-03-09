@@ -3,7 +3,6 @@ package elite.vault.db.dao;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
-import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -13,53 +12,71 @@ import java.sql.SQLException;
 @RegisterRowMapper(StationsDao.StationMapper.class)
 public interface StationsDao {
 
-
-    @SqlUpdate("""
-            INSERT INTO stations (systemaddress, marketId, realname, controllingfaction, controllingfactionstate, distancetoarrival, primaryeconomy, economies, government, services, haslargepad, hasmediumpad, hassmallpad, stationType)
-            VALUES (:systemAddress, :marketId, :realName, :controllingFaction, :controllingFactionState, :distanceToArrival, :primaryEconomy, :economies, :government, :services, :hasLargePad, :hasMediumPad, :hasSmallPad, :stationType)
-            ON DUPLICATE KEY UPDATE
-                realName    = VALUES(realName),
-                controllingFaction        = VALUES(controllingFaction),
-                controllingFactionState = VALUES(controllingFactionState),
-                distanceToArrival = VALUES(distanceToArrival),
-                primaryEconomy     = VALUES(primaryEconomy),
-                economies     = VALUES(economies),
-                government     = VALUES(government),
-                services     = VALUES(services),
-                stationType     = VALUES(stationType),
-                hasLargePad     = VALUES(hasLargePad),
-                hasMediumPad     = VALUES(hasMediumPad),
-                hasSmallPad     = VALUES(hasSmallPad),
-                dirty           = TRUE
-            """)
-    void upsert(@BindBean StationsDao.Station data);
-
     /**
-     * Mark a station as dirty so the next trade pair recalculation
-     * processes its fresh commodity snapshot.
-     * Called by MarketManager.save() after every commodity ingest.
+     * Upsert a station.
+     * x, y, z are resolved by StationManager from star_system before calling this.
+     * Stations whose system is not yet in star_system are dropped by StationManager
+     * and never reach this method.
      */
-    @SqlUpdate("UPDATE stations SET dirty = TRUE WHERE marketId = :marketId")
-    void markDirty(@Bind("marketId") long marketId);
+    @SqlUpdate("""
+            INSERT INTO stations (
+                systemAddress, marketId, realName,
+                controllingFaction, controllingFactionState,
+                distanceToArrival, primaryEconomy, economies,
+                government, services,
+                hasLargePad, hasMediumPad, hasSmallPad,
+                stationType,
+                x, y, z
+            )
+            VALUES (
+                :systemAddress, :marketId, :realName,
+                :controllingFaction, :controllingFactionState,
+                :distanceToArrival, :primaryEconomy, :economies,
+                :government, :services,
+                :hasLargePad, :hasMediumPad, :hasSmallPad,
+                :stationType,
+                :x, :y, :z
+            )
+            ON DUPLICATE KEY UPDATE
+                realName                = VALUES(realName),
+                controllingFaction      = VALUES(controllingFaction),
+                controllingFactionState = VALUES(controllingFactionState),
+                distanceToArrival       = VALUES(distanceToArrival),
+                primaryEconomy          = VALUES(primaryEconomy),
+                economies               = VALUES(economies),
+                government              = VALUES(government),
+                services                = VALUES(services),
+                stationType             = VALUES(stationType),
+                hasLargePad             = VALUES(hasLargePad),
+                hasMediumPad            = VALUES(hasMediumPad),
+                hasSmallPad             = VALUES(hasSmallPad),
+                x                       = VALUES(x),
+                y                       = VALUES(y),
+                z                       = VALUES(z)
+            """)
+    void upsert(@BindBean Station data);
 
 
     class StationMapper implements RowMapper<Station> {
-
-        @Override public Station map(ResultSet rs, StatementContext ctx) throws SQLException {
-            Station entity = new Station();
-            entity.setControllingFaction(rs.getString("controllingFaction"));
-            entity.setControllingFactionState(rs.getString("controllingFactionState"));
-            entity.setDistanceToArrival(rs.getDouble("distanceToArrival"));
-            entity.setRealName(rs.getString("realName"));
-            entity.setPrimaryEconomy(rs.getString("primaryEconomy"));
-            entity.setEconomies(rs.getString("economies"));
-            entity.setGovernment(rs.getString("government"));
-            entity.setServices(rs.getString("services"));
-            entity.setHasLargePad(rs.getBoolean("hasLargePad"));
-            entity.setHasMediumPad(rs.getBoolean("hasMediumPad"));
-            entity.setHasSmallPad(rs.getBoolean("hasSmallPad"));
-            entity.setStationType(rs.getString("stationType"));
-            return entity;
+        @Override
+        public Station map(ResultSet rs, StatementContext ctx) throws SQLException {
+            Station e = new Station();
+            e.setControllingFaction(rs.getString("controllingFaction"));
+            e.setControllingFactionState(rs.getString("controllingFactionState"));
+            e.setDistanceToArrival(rs.getDouble("distanceToArrival"));
+            e.setRealName(rs.getString("realName"));
+            e.setPrimaryEconomy(rs.getString("primaryEconomy"));
+            e.setEconomies(rs.getString("economies"));
+            e.setGovernment(rs.getString("government"));
+            e.setServices(rs.getString("services"));
+            e.setHasLargePad(rs.getBoolean("hasLargePad"));
+            e.setHasMediumPad(rs.getBoolean("hasMediumPad"));
+            e.setHasSmallPad(rs.getBoolean("hasSmallPad"));
+            e.setStationType(rs.getString("stationType"));
+            e.setX(rs.getDouble("x"));
+            e.setY(rs.getDouble("y"));
+            e.setZ(rs.getDouble("z"));
+            return e;
         }
     }
 
@@ -78,117 +95,144 @@ public interface StationsDao {
         private Boolean hasLargePad;
         private Boolean hasMediumPad;
         private Boolean hasSmallPad;
+        private double x;
+        private double y;
+        private double z;
 
         public Long getSystemAddress() {
             return systemAddress;
         }
 
-        public void setSystemAddress(Long systemAddress) {
-            this.systemAddress = systemAddress;
+        public void setSystemAddress(Long v) {
+            this.systemAddress = v;
         }
 
         public Long getMarketId() {
             return marketId;
         }
 
-        public void setMarketId(Long marketId) {
-            this.marketId = marketId;
+        public void setMarketId(Long v) {
+            this.marketId = v;
         }
 
         public String getRealName() {
             return realName;
         }
 
-        public void setRealName(String realName) {
-            this.realName = realName;
+        public void setRealName(String v) {
+            this.realName = v;
         }
 
         public String getControllingFaction() {
             return controllingFaction;
         }
 
-        public void setControllingFaction(String controllingFaction) {
-            this.controllingFaction = controllingFaction;
+        public void setControllingFaction(String v) {
+            this.controllingFaction = v;
         }
 
         public String getControllingFactionState() {
             return controllingFactionState;
         }
 
-        public void setControllingFactionState(String controllingFactionState) {
-            this.controllingFactionState = controllingFactionState;
+        public void setControllingFactionState(String v) {
+            this.controllingFactionState = v;
         }
 
         public Double getDistanceToArrival() {
             return distanceToArrival;
         }
 
-        public void setDistanceToArrival(Double distanceToArrival) {
-            this.distanceToArrival = distanceToArrival;
+        public void setDistanceToArrival(Double v) {
+            this.distanceToArrival = v;
         }
 
         public String getPrimaryEconomy() {
             return primaryEconomy;
         }
 
-        public void setPrimaryEconomy(String primaryEconomy) {
-            this.primaryEconomy = primaryEconomy;
+        public void setPrimaryEconomy(String v) {
+            this.primaryEconomy = v;
         }
 
         public String getEconomies() {
             return economies;
         }
 
-        public void setEconomies(String economies) {
-            this.economies = economies;
+        public void setEconomies(String v) {
+            this.economies = v;
         }
 
         public String getGovernment() {
             return government;
         }
 
-        public void setGovernment(String government) {
-            this.government = government;
+        public void setGovernment(String v) {
+            this.government = v;
         }
 
         public String getServices() {
             return services;
         }
 
-        public void setServices(String services) {
-            this.services = services;
+        public void setServices(String v) {
+            this.services = v;
         }
 
         public Boolean getHasLargePad() {
             return hasLargePad;
         }
 
-        public void setHasLargePad(Boolean hasLargePad) {
-            this.hasLargePad = hasLargePad;
+        public void setHasLargePad(Boolean v) {
+            this.hasLargePad = v;
         }
 
         public Boolean getHasMediumPad() {
             return hasMediumPad;
         }
 
-        public void setHasMediumPad(Boolean hasMediumPad) {
-            this.hasMediumPad = hasMediumPad;
+        public void setHasMediumPad(Boolean v) {
+            this.hasMediumPad = v;
         }
 
         public Boolean getHasSmallPad() {
             return hasSmallPad;
         }
 
-        public void setHasSmallPad(Boolean hasSmallPad) {
-            this.hasSmallPad = hasSmallPad;
+        public void setHasSmallPad(Boolean v) {
+            this.hasSmallPad = v;
         }
 
         public String getStationType() {
             return stationType;
         }
 
-        public void setStationType(String stationType) {
-            this.stationType = stationType;
+        public void setStationType(String v) {
+            this.stationType = v;
+        }
+
+        public double getX() {
+            return x;
+        }
+
+        public void setX(double v) {
+            this.x = v;
+        }
+
+        public double getY() {
+            return y;
+        }
+
+        public void setY(double v) {
+            this.y = v;
+        }
+
+        public double getZ() {
+            return z;
+        }
+
+        public void setZ(double v) {
+            this.z = v;
         }
     }
 }

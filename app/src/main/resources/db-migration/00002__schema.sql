@@ -1,5 +1,5 @@
 -- ============================================================================
--- Elite Vault — Partition maintenance procedure and event
+-- Elite Vault - Partition maintenance procedure and event
 -- MariaDB 10.3
 --
 -- NOTE: This file is NOT executed via JDBI's createScript().

@@ -50,7 +50,6 @@ public class Database {
         try {
             return JDBI.withExtension(daoClass, block::apply);
         } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException("DAO operation failed: " + daoClass.getSimpleName(), e);
         }
     }

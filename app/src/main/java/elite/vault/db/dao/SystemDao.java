@@ -47,6 +47,20 @@ public interface SystemDao {
     StarSystem findByName(@Bind("starName") String starName);
 
 
+    /**
+     * Look up a star system by its EDDN systemAddress.
+     * Used by StationManager to resolve coordinates before upserting a station.
+     * Returns null if the system has not yet been seen via EDDN.
+     */
+    @SqlQuery("""
+            SELECT systemAddress, starName, x, y, z, sector
+            FROM star_system
+            WHERE systemAddress = :systemAddress
+            LIMIT 1
+            """)
+    StarSystem findByAddress(@Bind("systemAddress") long systemAddress);
+
+
     @SqlQuery("""
             WITH candidates AS (
                     SELECT systemAddress, starName, x, y, z, date, sector,
@@ -76,7 +90,7 @@ public interface SystemDao {
             @Bind("minZ") double minZ, @Bind("maxZ") double maxZ,
             @Bind("cx") double cx, @Bind("cy") double cy, @Bind("cz") double cz,
             @Bind("gx") double gx, @Bind("gy") double gy, @Bind("gz") double gz,
-            @Bind("minDistSq") double minDistSq,  // NEW: dynamic sliver
+            @Bind("minDistSq") double minDistSq,
             @Bind("currentName") String currentName
     );
 

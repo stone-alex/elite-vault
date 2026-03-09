@@ -1,5 +1,5 @@
 -- ============================================================================
--- Elite Vault — Database Schema v1
+-- Elite Vault - Database Schema v1
 -- MariaDB 10.3
 -- Tables only. Procedure and event are in 00002__procedures.sql
 -- ============================================================================
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS star_system (
 
 
 -- ============================================================================
--- Stations  (marketId = stationId from EDDN — same value, clearer name)
+-- Stations  (marketId = stationId from EDDN - same value, clearer name)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS stations (
@@ -75,14 +75,14 @@ CREATE TABLE IF NOT EXISTS stations (
 
 
 -- ============================================================================
--- Commodity  (hot table — partitioned, pruned to 3-hour window)
+-- Commodity  (hot table - partitioned, pruned to 3-hour window)
 --
 -- Ingest pattern: full snapshot replace per station
 --   1. DELETE FROM commodity WHERE marketId = ?
 --   2. Bulk INSERT new rows
 --
 -- Partition key (received_at) must be part of the PRIMARY KEY in MariaDB 10.3.
--- DATETIME rejected as partition expression (timezone-dependent) — stored as
+-- DATETIME rejected as partition expression (timezone-dependent) - stored as
 -- INT UNSIGNED epoch seconds instead. Pure integer arithmetic is deterministic.
 -- ============================================================================
 
