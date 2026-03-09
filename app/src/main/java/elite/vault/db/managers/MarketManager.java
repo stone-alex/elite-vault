@@ -31,12 +31,8 @@ public final class MarketManager {
 
     // -------------------------------------------------------------------------
     // SQL for queries that require a JDBI defineList for the planetary type
-    // IN-clause. These cannot go through @SqlQuery annotations because the
-    // <planetaryTypes> placeholder must be resolved at Handle level.
-    // -------------------------------------------------------------------------
-
     // SQL for querying the pre-calculated trade_pair table.
-    // Uses define() for <planetaryTypes> — same pattern as the live queries.
+    // Uses define() for <planetaryTypes> - same pattern as the live queries.
     private static final String FIND_BEST_PAIRS_SQL = """
             SELECT
                 tp.commodityId,
@@ -109,7 +105,7 @@ public final class MarketManager {
     /**
      * Commodity name → commodity_type.id cache.
      * Loaded from DB at construction. Updated on cache miss (new commodity seen).
-     * ~300 entries at steady state — fits entirely in L1.
+     * ~300 entries at steady state - fits entirely in L1.
      */
     private final ConcurrentHashMap<String, Short> commodityTypeCache = new ConcurrentHashMap<>();
 
@@ -144,7 +140,7 @@ public final class MarketManager {
             }
             log.info("Commodity type cache loaded: {} entries", commodityTypeCache.size());
         } catch (Exception e) {
-            // Blank DB on first run — cache stays empty, entries added on first ingest
+            // Blank DB on first run - cache stays empty, entries added on first ingest
             log.info("Commodity type cache empty (blank DB or first run)");
         }
     }
@@ -153,7 +149,7 @@ public final class MarketManager {
      * Resolve a commodity name to its DB id.
      * On cache miss: inserts the name into commodity_type (INSERT IGNORE),
      * fetches the id, caches it. This path is hit only for genuinely new
-     * commodity names — essentially never after the first ingest session.
+     * commodity names - essentially never after the first ingest session.
      */
     private short resolveCommodityId(String name) {
         return commodityTypeCache.computeIfAbsent(name, n ->
@@ -172,7 +168,7 @@ public final class MarketManager {
     /**
      * Persist a full market snapshot from EDDN.
      * Pattern: DELETE existing rows for this market, then bulk INSERT the new snapshot.
-     * If the INSERT fails the DELETE is effectively lost — the market will be empty
+     * If the INSERT fails the DELETE is effectively lost - the market will be empty
      * until the next snapshot arrives, which is acceptable given the 3-hour window.
      */
     public void save(EddnDto data, Long systemAddress) {
@@ -184,7 +180,7 @@ public final class MarketManager {
         List<EDDN_CommodityItemDto> commodities = data.getCommodities();
         if (commodities == null || commodities.isEmpty()) return;
 
-        // Build the batch — resolve/create commodity type ids before opening the lock
+        // Build the batch - resolve/create commodity type ids before opening the lock
         List<CommodityDao.CommodityRow> batch = new ArrayList<>(commodities.size());
         for (EDDN_CommodityItemDto item : commodities) {
             if (item == null || item.getName() == null) continue;
@@ -197,21 +193,63 @@ public final class MarketManager {
         final long mid = marketId;
         Object lock = marketLocks.computeIfAbsent(mid, k -> new Object());
         synchronized (lock) {
-            Database.withDao(CommodityDao.class, dao -> {
-                dao.deleteByMarket(mid);
-                return null;
-            });
-            Database.withDao(CommodityDao.class, dao -> {
-                dao.insertBatch(batch);
-                return null;
-            });
-            // Mark station dirty so the next trade pair recalculation
-            // picks up the fresh commodity snapshot for this market.
-            Database.withDao(StationsDao.class, dao -> {
-                dao.markDirty(mid);
-                return null;
-            });
+            saveWithRetry(mid, batch);
         }
+    }
+
+    /**
+     * Executes the commodity delete/insert/markDirty sequence with deadlock retry.
+     * Deadlocks (SQLState 40001) are expected when the trade pair procedure and ingest
+     * both touch the same station rows concurrently. MariaDB kills the younger
+     * transaction - we simply retry it up to 3 times with brief backoff.
+     */
+    private void saveWithRetry(long mid, List<CommodityDao.CommodityRow> batch) {
+        int attempts = 0;
+        while (true) {
+            try {
+                Database.withDao(CommodityDao.class, dao -> {
+                    dao.deleteByMarket(mid);
+                    return null;
+                });
+                Database.withDao(CommodityDao.class, dao -> {
+                    dao.insertBatch(batch);
+                    return null;
+                });
+                Database.withDao(StationsDao.class, dao -> {
+                    dao.markDirty(mid);
+                    return null;
+                });
+                return; // success
+            } catch (Exception e) {
+                String sqlState = extractSqlState(e);
+                if ("40001".equals(sqlState) && attempts < 3) {
+                    attempts++;
+                    log.debug("Deadlock on market {} - retry {}/3", mid, attempts);
+                    try {
+                        Thread.sleep(50L * attempts); // 50ms, 100ms, 150ms
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                } else {
+                    throw e; // not a deadlock or retries exhausted - let it propagate
+                }
+            }
+        }
+    }
+
+    /**
+     * Walks the exception chain looking for an SQLException with a SQLState.
+     * JDBI wraps the underlying SQLException in UnableToExecuteStatementException.
+     */
+    private String extractSqlState(Throwable t) {
+        while (t != null) {
+            if (t instanceof java.sql.SQLException) {
+                return ((java.sql.SQLException) t).getSQLState();
+            }
+            t = t.getCause();
+        }
+        return null;
     }
 
     private CommodityDao.CommodityRow toRow(EDDN_CommodityItemDto item, long marketId,
@@ -249,13 +287,11 @@ public final class MarketManager {
         if (commodityId == null) return Collections.emptyList();
 
         final short cid = commodityId;
-        final SystemDao.StarSystem origin = Database.withDao(SystemDao.class,
-                dao -> dao.findByName(startingSystem));
+        final SystemDao.StarSystem origin = Database.withDao(SystemDao.class, dao -> dao.findByName(startingSystem));
         if (origin == null) return Collections.emptyList();
 
         return Database.withDao(CommodityDao.class, dao -> {
-            List<CommodityOfferProjection> rows = dao.findBestCommodityOffers(
-                    cid, maxDistance, origin.getX(), origin.getY(), origin.getZ());
+            List<CommodityOfferProjection> rows = dao.findBestCommodityOffers(cid, maxDistance, origin.getX(), origin.getY(), origin.getZ());
 
             List<API_CommodityDto> result = new ArrayList<>(rows.size());
             for (CommodityOfferProjection r : rows) {
@@ -313,7 +349,7 @@ public final class MarketManager {
                 .map(t -> "'" + t.replace("'", "''") + "'")
                 .collect(java.util.stream.Collectors.joining(","));
 
-        // Data age — read once before the loop, add to response
+        // Data age - read once before the loop, add to response
         LocalDateTime lastCalcAt = Database.withDao(TradePairDao.class,
                 TradePairDao::getLastCalculatedAt);
 
@@ -331,7 +367,7 @@ public final class MarketManager {
             final double refY = curY;
             final double refZ = curZ;
 
-            // Single indexed scan against trade_pair — no heavy joins
+            // Single indexed scan against trade_pair - no heavy joins
             final String ptClause = planetaryTypesInClause;
             List<TradePairDao.TradePairRow> candidates = Database.withHandle(handle ->
                     handle.createQuery(FIND_BEST_PAIRS_SQL)
@@ -357,7 +393,7 @@ public final class MarketManager {
             // Pick the best candidate not already used in this route
             TradePairDao.TradePairRow best = null;
             for (TradePairDao.TradePairRow row : candidates) {
-                // Dedup on sell station — avoid visiting the same destination twice.
+                // Dedup on sell station - avoid visiting the same destination twice.
                 // Also skip if this sell station was a buy station earlier (would fly empty back).
                 String sellKey = String.valueOf(row.getSellMarketId());
                 String buyKey = String.valueOf(row.getBuyMarketId());
@@ -397,13 +433,13 @@ public final class MarketManager {
             legs.put(hop, dto);
 
             // Advance to the sell system for the next hop.
-            // Coords come directly from the trade_pair row — no DB lookup needed.
+            // Coords come directly from the trade_pair row - no DB lookup needed.
             curX = best.getSellX();
             curY = best.getSellY();
             curZ = best.getSellZ();
 
             if (curX == 0 && curY == 0 && curZ == 0) {
-                // Sell coords missing from trade_pair row — fall back to DB lookup
+                // Sell coords missing from trade_pair row - fall back to DB lookup
                 final String sellSysName = best.getSellSystem();
                 SystemDao.StarSystem sellSys = Database.withDao(SystemDao.class,
                         dao -> dao.findByName(sellSysName));

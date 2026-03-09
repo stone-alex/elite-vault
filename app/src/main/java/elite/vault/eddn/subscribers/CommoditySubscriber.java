@@ -27,7 +27,7 @@ public class CommoditySubscriber {
         EddnDto data = event.getData();
         SystemDao.StarSystem star = starSystemManager.findByName(data.getSystemName());
         if (star == null) {
-            log.debug("Market update dropped — unknown system: {}", data.getSystemName());
+            log.debug("Market update dropped - unknown system: {}", data.getSystemName());
             return;
         }
         log.info("Market update " + data.getMarketId() + " " + star.getStarName() + " " + data.getStationName());

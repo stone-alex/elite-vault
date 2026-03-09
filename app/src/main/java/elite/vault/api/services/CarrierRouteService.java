@@ -135,7 +135,7 @@ public class CarrierRouteService {
             grid.computeIfAbsent(key, k -> new ArrayList<>()).add(s);
         }
 
-        // === Phase 3: Greedy walk with backtracking — entirely in memory ===
+        // === Phase 3: Greedy walk with backtracking - entirely in memory ===
         double minDistSq = (double) jumpRange * jumpRange;
         List<String> path = new ArrayList<>();
         Set<String> visited = new HashSet<>();
@@ -152,7 +152,7 @@ public class CarrierRouteService {
                 return new RouteResult(path, path.size());
             }
 
-            // Find neighbors from grid (in memory — microseconds, not seconds)
+            // Find neighbors from grid (in memory - microseconds, not seconds)
             double effectiveMinDistSq = (remainingLy > CARRIER_MAX_JUMP_LY * 1.5) ? minDistSq : 0.0;
             List<SystemDao.StarSystem> candidates = findNeighborsInMemory(
                     current, goal, grid, cellSize, effectiveMinDistSq, visited
@@ -161,7 +161,7 @@ public class CarrierRouteService {
             SystemDao.StarSystem next = candidates.isEmpty() ? null : candidates.getFirst();
 
             if (next == null) {
-                // Dead end — backtrack
+                // Dead end - backtrack
                 if (backtrackStack.isEmpty()) {
                     return new RouteResult(List.of(), -1);
                 }

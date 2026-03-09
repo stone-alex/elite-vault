@@ -10,7 +10,7 @@ import java.util.List;
 public interface TradePairDao {
 
     // -------------------------------------------------------------------------
-    // Meta — data age for API responses
+    // Meta - data age for API responses
     // -------------------------------------------------------------------------
 
     /**
@@ -43,7 +43,7 @@ public interface TradePairDao {
      * <p>
      * Filters applied:
      * - buy system within jumpRange of the reference point (3D bounding cube
-     * + exact sphere — buyX/Y/Z indexes make the cube cheap)
+     * + exact sphere - buyX/Y/Z indexes make the cube cheap)
      * - distanceLy <= jumpRange  (buy→sell leg fits in one jump sequence)
      * - station distance from system entry point
      * - pad size (large required → buyHasLargePad AND sellHasLargePad;
@@ -54,7 +54,7 @@ public interface TradePairDao {
      * so high-volume runs rank above small-stock outliers.
      * <p>
      * Note: the planetary type IN-clause (<planetaryTypes>) must be injected
-     * via handle.define() — see MarketManager. Same pattern as before.
+     * via handle.define() - see MarketManager. Same pattern as before.
      */
     @RegisterBeanMapper(TradePairRow.class)
     @SqlQuery("""
@@ -137,7 +137,7 @@ public interface TradePairDao {
 
 
     // -------------------------------------------------------------------------
-    // Supporting type — maps directly from the trade_pair table columns
+    // Supporting type - maps directly from the trade_pair table columns
     // -------------------------------------------------------------------------
 
     class TradePairRow {

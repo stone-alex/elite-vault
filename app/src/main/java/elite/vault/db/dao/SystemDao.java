@@ -19,7 +19,7 @@ public interface SystemDao {
      * Upserts a star system entry.
      * - Inserts if systemAddress does not exist
      * - Updates coordinates, name and sector if systemAddress already exists
-     * (latest data wins — typical for EDDN journal entries)
+     * (latest data wins - typical for EDDN journal entries)
      * <p>
      * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
      * Requires PRIMARY KEY or UNIQUE constraint on systemAddress (already present).

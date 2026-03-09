@@ -40,7 +40,7 @@ public interface CommodityDao {
 
     /**
      * Load all known commodity types into a name→id map on startup.
-     * Returns empty list on a blank DB — that is normal.
+     * Returns empty list on a blank DB - that is normal.
      */
     @SqlQuery("SELECT name, id FROM commodity_type")
     @RegisterBeanMapper(CommodityTypeRow.class)
@@ -66,7 +66,7 @@ public interface CommodityDao {
 
     /**
      * Delete all commodity rows for a market. Step 1 of the snapshot replace.
-     * Hits idx_c_market — single partition scan.
+     * Hits idx_c_market - single partition scan.
      */
     @SqlUpdate("DELETE FROM commodity WHERE marketId = :marketId")
     void deleteByMarket(@Bind("marketId") long marketId);
@@ -92,7 +92,7 @@ public interface CommodityDao {
      * <p>
      * Distance is 3D: bounding cube on indexed x/y/z columns for the initial
      * candidate set, then exact sqrt distance for the final filter and sort.
-     * The 2D spatial index (pos) is intentionally NOT used here — it only stores
+     * The 2D spatial index (pos) is intentionally NOT used here - it only stores
      * X and Y and would silently under-filter in a 3D galaxy.
      */
     @RegisterBeanMapper(CommodityOfferProjection.class)
@@ -159,7 +159,7 @@ public interface CommodityDao {
 
     /**
      * One row to be inserted into the commodity table.
-     * Prices/stock/demand use int — Elite credits are whole numbers,
+     * Prices/stock/demand use int - Elite credits are whole numbers,
      * and INT UNSIGNED in the schema covers the full range.
      */
     class CommodityRow {

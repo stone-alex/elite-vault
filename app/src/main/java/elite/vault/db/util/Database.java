@@ -30,21 +30,21 @@ public class Database {
             try {
                 DatabaseMigrator.migrate(handle);
             } catch (Exception e) {
-                throw new RuntimeException("Migration failed — your DB might be b0rked", e);
+                throw new RuntimeException("Migration failed - your DB might be b0rked", e);
             }
         });
         try (Handle h = JDBI.open()) {
             h.execute("CALL maintain_commodity_partitions(72, 6)");
             log.info("Commodity partitions initialized");
         } catch (Exception e) {
-            log.warn("Partition maintenance failed at startup — commodity inserts may deadlock", e);
+            log.warn("Partition maintenance failed at startup - commodity inserts may deadlock", e);
         }
     }
 
 
     /**
      * Standard single-DAO operation. Opens a handle, runs the block, closes the handle.
-     * Not transactional — do not use when you need DELETE + INSERT atomicity.
+     * Not transactional - do not use when you need DELETE + INSERT atomicity.
      */
     public static <T, R> R withDao(Class<T> daoClass, Function<T, R> block) {
         try {
@@ -59,7 +59,7 @@ public class Database {
      * Transactional handle operation. Opens a single connection, begins a transaction,
      * runs the block, commits on success, rolls back on any exception.
      * <p>
-     * Use this when you need multiple DAO operations to be atomic — e.g. the
+     * Use this when you need multiple DAO operations to be atomic - e.g. the
      * commodity snapshot replace (DELETE existing rows + bulk INSERT new rows).
      * <p>
      * Example:
@@ -82,7 +82,7 @@ public class Database {
     }
 
     /**
-     * Raw handle query — opens a handle, runs the block, closes it.
+     * Raw handle query - opens a handle, runs the block, closes it.
      * Use this when you need access to Handle-level features that aren't
      * available through @SqlQuery annotations, such as defineList() for
      * dynamic IN-clauses (e.g. the planetary station type filter).
@@ -109,7 +109,7 @@ public class Database {
     }
 
     /**
-     * Raw handle — caller is responsible for close(). Use sparingly.
+     * Raw handle - caller is responsible for close(). Use sparingly.
      */
     public static Handle init() {
         return JDBI.open();
@@ -191,7 +191,7 @@ public class Database {
                 "&cachePrepStmts=true" +
                 "&prepStmtCacheSize=150" +
                 "&prepStmtCacheSqlLimit=2048" +
-                "&rewriteBatchedStatements=true" +   // multi-row INSERT rewrite — critical for batch perf
+                "&rewriteBatchedStatements=true" +   // multi-row INSERT rewrite - critical for batch perf
                 "&socketTimeout=30000" +
                 "&connectTimeout=10000" +
                 "&useLocalSessionState=true" +

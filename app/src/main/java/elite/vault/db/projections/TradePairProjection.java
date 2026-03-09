@@ -5,7 +5,7 @@ package elite.vault.db.projections;
  * <p>
  * Buy-side fields are populated by findBuyOffers / findBuyOffersAtStation.
  * Sell-side fields are populated by findBestSellFor.
- * A single instance never holds both sides at the same time — the two halves
+ * A single instance never holds both sides at the same time - the two halves
  * are matched in MarketManager.calculateTradeRoute.
  */
 public class TradePairProjection {
@@ -20,7 +20,7 @@ public class TradePairProjection {
     private long buySystemAddress;
     private double buyX;
     private double buyY;
-    private double buyZ;           // 3D — was missing in original
+    private double buyZ;           // 3D - was missing in original
     private double buyDistToArrival;
     private double buyDistanceLy;
 
@@ -31,9 +31,9 @@ public class TradePairProjection {
     private int sellDemand;
     private long sellMarketId;
     private long sellSystemAddress;
-    private double sellX;          // 3D — new
-    private double sellY;          // 3D — new
-    private double sellZ;          // 3D — new
+    private double sellX;          // 3D - new
+    private double sellY;          // 3D - new
+    private double sellZ;          // 3D - new
     private double sellDistToArrival;
     private double legDistanceLy;
 

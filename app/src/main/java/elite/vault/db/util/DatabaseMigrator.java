@@ -59,7 +59,7 @@ public class DatabaseMigrator {
                     // Execute via raw JDBC instead, statements separated by ---
                     executeProcedureFile(handle, sql, file);
                 } else {
-                    // Plain DDL — safe to use JDBI's script executor
+                    // Plain DDL - safe to use JDBI's script executor
                     handle.createScript(sql).execute();
                 }
             }
@@ -84,7 +84,7 @@ public class DatabaseMigrator {
     /**
      * Execute a file containing stored procedures or events via raw JDBC.
      * Statements in the file are separated by lines containing only "---".
-     * Each statement is executed individually — no DELIMITER tricks needed.
+     * Each statement is executed individually - no DELIMITER tricks needed.
      */
     private static void executeProcedureFile(Handle handle, String sql, String filename) throws Exception {
         // Split on /*SPLIT*/ marker, then strip comment lines per statement
