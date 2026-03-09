@@ -1,7 +1,6 @@
 package elite.vault.db.dao;
 
 import elite.vault.db.projections.CommodityOfferProjection;
-import elite.vault.db.projections.TradePairProjection;
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
@@ -10,8 +9,30 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.util.List;
+import java.util.Set;
 
 public interface CommodityDao {
+
+    // -------------------------------------------------------------------------
+    // Planetary station type classification
+    //
+    // Used by the allowPlanetary filter in all trade queries.
+    // Add new types here as they are discovered in EDDN data.
+    // Kept as a constant so it is easy to update in one place.
+    // -------------------------------------------------------------------------
+
+    Set<String> PLANETARY_STATION_TYPES = Set.of(
+            "SurfaceStation",
+            "OnFootSettlement",
+            "CraterOutpost",
+            "CraterPort",
+            "Settlement",
+            "Planetary Outpost",
+            "PlanetaryConstructionDepot",
+            "Planetary Construction Depot",
+            "Planetary Port"
+    );
+
 
     // -------------------------------------------------------------------------
     // Commodity type cache support
@@ -19,7 +40,7 @@ public interface CommodityDao {
 
     /**
      * Load all known commodity types into a name→id map on startup.
-     * Returns empty map on a blank DB — that is normal.
+     * Returns empty list on a blank DB — that is normal.
      */
     @SqlQuery("SELECT name, id FROM commodity_type")
     @RegisterBeanMapper(CommodityTypeRow.class)
@@ -40,7 +61,7 @@ public interface CommodityDao {
 
 
     // -------------------------------------------------------------------------
-    // Snapshot replace  (called inside Database.withTransaction)
+    // Snapshot replace
     // -------------------------------------------------------------------------
 
     /**
@@ -67,29 +88,35 @@ public interface CommodityDao {
     // -------------------------------------------------------------------------
 
     /**
-     * Find the best places to sell a specific commodity within a radius.
-     * Spatial filter on star_system.pos; commodity resolved to id by caller.
+     * Find the best places to sell a specific commodity near a reference point.
+     * <p>
+     * Distance is 3D: bounding cube on indexed x/y/z columns for the initial
+     * candidate set, then exact sqrt distance for the final filter and sort.
+     * The 2D spatial index (pos) is intentionally NOT used here — it only stores
+     * X and Y and would silently under-filter in a 3D galaxy.
      */
     @RegisterBeanMapper(CommodityOfferProjection.class)
     @SqlQuery("""
             SELECT
-                ss.starName                                              AS starName,
-                st.realName                                              AS stationName,
-                ct.name                                                  AS commodity,
-                c.sellPrice                                              AS sellPrice,
-                c.stock                                                  AS stock,
-                ROUND(ST_Distance(POINT(:refX, :refY), ss.pos), 1)      AS distanceLy,
-                c.marketId                                               AS marketId,
-                c.systemAddress                                          AS systemAddress
+                ss.starName                                                                          AS starName,
+                st.realName                                                                          AS stationName,
+                ct.name                                                                              AS commodity,
+                c.sellPrice                                                                          AS sellPrice,
+                c.stock                                                                              AS stock,
+                ROUND(SQRT(POW(ss.x - :refX, 2) + POW(ss.y - :refY, 2) + POW(ss.z - :refZ, 2)), 1)   AS distanceLy,
+                c.marketId                                                                           AS marketId,
+                c.systemAddress                                                                      AS systemAddress
             FROM commodity c
-            INNER JOIN commodity_type ct ON ct.id          = c.commodityId
-            INNER JOIN star_system     ss ON ss.systemAddress = c.systemAddress
-            INNER JOIN stations        st ON st.marketId    = c.marketId
+            INNER JOIN commodity_type ct ON ct.id             = c.commodityId
+            INNER JOIN star_system     ss ON ss.systemAddress  = c.systemAddress
+            INNER JOIN stations        st ON st.marketId       = c.marketId
             WHERE c.commodityId = :commodityId
               AND c.stock       > 0
               AND c.sellPrice   > 0
-              AND MBRContains(ST_Buffer(POINT(:refX, :refY), :maxLy), ss.pos)
-              AND ST_Distance(POINT(:refX, :refY), ss.pos) <= :maxLy
+              AND ss.x BETWEEN :refX - :maxLy AND :refX + :maxLy
+              AND ss.y BETWEEN :refY - :maxLy AND :refY + :maxLy
+              AND ss.z BETWEEN :refZ - :maxLy AND :refZ + :maxLy
+              AND POW(ss.x - :refX, 2) + POW(ss.y - :refY, 2) + POW(ss.z - :refZ, 2) <= POW(:maxLy, 2)
             ORDER BY c.sellPrice DESC, c.stock DESC
             LIMIT 20
             """)
@@ -97,140 +124,9 @@ public interface CommodityDao {
             @Bind("commodityId") short commodityId,
             @Bind("maxLy") double maxLy,
             @Bind("refX") double refX,
-            @Bind("refY") double refY
-    );
-
-    /**
-     * Find the best buy offers near a reference point.
-     * Used for the first hop of a trade route, or when arriving at a new system.
-     * <p>
-     * Returns one row per commodity (best buy price), filtered by:
-     * - station distance from system entry point
-     * - jump range radius from reference coords
-     * - optional landing pad size
-     * - optional planetary landing filter
-     */
-    @RegisterBeanMapper(TradePairProjection.class)
-    @SqlQuery("""
-            SELECT
-                ss.starName                                              AS buySystem,
-                st.realName                                              AS buyStation,
-                ct.name                                                  AS commodity,
-                c.buyPrice                                               AS buyPrice,
-                c.stock                                                  AS buyStock,
-                c.marketId                                               AS buyMarketId,
-                c.systemAddress                                          AS buySystemAddress,
-                ss.x                                                     AS buyX,
-                ss.y                                                     AS buyY,
-                st.distanceToArrival                                     AS buyDistToArrival,
-                ROUND(ST_Distance(POINT(:refX, :refY), ss.pos), 1)      AS buyDistanceLy
-            FROM (
-                SELECT c.*,
-                       ROW_NUMBER() OVER (PARTITION BY c.commodityId ORDER BY c.buyPrice ASC, c.stock DESC) AS rn
-                FROM commodity c
-                INNER JOIN stations st ON st.marketId = c.marketId
-                WHERE c.buyPrice           > 0
-                  AND c.stock              > 0
-                  AND st.distanceToArrival <= :maxDistFromEntrance
-                  AND (:requireLargePad  = FALSE OR st.hasLargePad  = TRUE)
-                  AND (:requireMediumPad = FALSE OR st.hasMediumPad = TRUE)
-                  AND (:allowPlanetary   = TRUE  OR st.stationType NOT IN ('SurfaceStation','OnFootSettlement','CraterOutpost','CraterPort'))
-            ) c
-            INNER JOIN commodity_type ct ON ct.id             = c.commodityId
-            INNER JOIN star_system     ss ON ss.systemAddress  = c.systemAddress
-            INNER JOIN stations        st ON st.marketId       = c.marketId
-            WHERE c.rn = 1
-              AND MBRContains(ST_Buffer(POINT(:refX, :refY), :jumpRange), ss.pos)
-              AND ST_Distance(POINT(:refX, :refY), ss.pos) <= :jumpRange
-            ORDER BY c.buyPrice ASC
-            LIMIT 10
-            """)
-    List<TradePairProjection> findBuyOffers(
-            @Bind("jumpRange") double jumpRange,
-            @Bind("refX") double refX,
             @Bind("refY") double refY,
-            @Bind("maxDistFromEntrance") double maxDistFromEntrance,
-            @Bind("requireLargePad") boolean requireLargePad,
-            @Bind("requireMediumPad") boolean requireMediumPad,
-            @Bind("allowPlanetary") boolean allowPlanetary
+            @Bind("refZ") double refZ
     );
-
-    /**
-     * Find the best single sell destination for a specific commodity,
-     * reachable within jumpRange of the given reference coords.
-     * Excludes the station where it was bought.
-     */
-    @RegisterBeanMapper(TradePairProjection.class)
-    @SqlQuery("""
-            SELECT
-                ss.starName                                              AS sellSystem,
-                st.realName                                              AS sellStation,
-                ct.name                                                  AS commodity,
-                c.sellPrice                                              AS sellPrice,
-                c.demand                                                 AS sellDemand,
-                c.marketId                                               AS sellMarketId,
-                c.systemAddress                                          AS sellSystemAddress,
-                st.distanceToArrival                                     AS sellDistToArrival,
-                ROUND(ST_Distance(POINT(:refX, :refY), ss.pos), 1)      AS legDistanceLy
-            FROM commodity c
-            INNER JOIN commodity_type ct ON ct.id             = c.commodityId
-            INNER JOIN star_system     ss ON ss.systemAddress  = c.systemAddress
-            INNER JOIN stations        st ON st.marketId       = c.marketId
-            WHERE c.commodityId         = :commodityId
-              AND c.sellPrice           > :minSellPrice
-              AND c.demand              > 0
-              AND c.marketId           != :excludeMarketId
-              AND st.distanceToArrival  <= :maxDistFromEntrance
-              AND (:requireLargePad  = FALSE OR st.hasLargePad  = TRUE)
-              AND (:requireMediumPad = FALSE OR st.hasMediumPad = TRUE)
-              AND (:allowPlanetary   = TRUE  OR st.stationType NOT IN ('SurfaceStation', 'OnFootSettlement', 'CraterOutpost', 'CraterPort'))
-              AND MBRContains(ST_Buffer(POINT(:refX, :refY), :jumpRange), ss.pos)
-              AND ST_Distance(POINT(:refX, :refY), ss.pos) <= :jumpRange
-            ORDER BY c.sellPrice DESC
-            LIMIT 1
-            """)
-    List<TradePairProjection> findBestSellFor(
-            @Bind("commodityId") short commodityId,
-            @Bind("minSellPrice") int minSellPrice,
-            @Bind("excludeMarketId") long excludeMarketId,
-            @Bind("jumpRange") double jumpRange,
-            @Bind("refX") double refX,
-            @Bind("refY") double refY,
-            @Bind("maxDistFromEntrance") double maxDistFromEntrance,
-            @Bind("requireLargePad") boolean requireLargePad,
-            @Bind("requireMediumPad") boolean requireMediumPad,
-            @Bind("allowPlanetary") boolean allowPlanetary
-    );
-
-    /**
-     * Find all buy offers at a specific station (used for subsequent hops —
-     * the pilot is already docked, so no spatial filter needed).
-     */
-    @RegisterBeanMapper(TradePairProjection.class)
-    @SqlQuery("""
-            SELECT
-                ss.starName          AS buySystem,
-                st.realName          AS buyStation,
-                ct.name              AS commodity,
-                c.buyPrice           AS buyPrice,
-                c.stock              AS buyStock,
-                c.marketId           AS buyMarketId,
-                c.systemAddress      AS buySystemAddress,
-                ss.x                 AS buyX,
-                ss.y                 AS buyY,
-                st.distanceToArrival AS buyDistToArrival,
-                0.0                  AS buyDistanceLy
-            FROM commodity c
-            INNER JOIN commodity_type ct ON ct.id             = c.commodityId
-            INNER JOIN star_system     ss ON ss.systemAddress  = c.systemAddress
-            INNER JOIN stations        st ON st.marketId       = c.marketId
-            WHERE c.marketId  = :marketId
-              AND c.buyPrice  > 0
-              AND c.stock     > 0
-            ORDER BY c.buyPrice ASC
-            LIMIT 10
-            """)
-    List<TradePairProjection> findBuyOffersAtStation(@Bind("marketId") long marketId);
 
 
     // -------------------------------------------------------------------------

@@ -39,7 +39,7 @@ public interface SystemDao {
 
 
     @SqlQuery("""
-            SELECT *
+            SELECT systemAddress, starName, x, y, z, sector
             FROM star_system
             WHERE starName = :starName
             LIMIT 1

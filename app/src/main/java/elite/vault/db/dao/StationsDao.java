@@ -3,6 +3,7 @@ package elite.vault.db.dao;
 import org.jdbi.v3.core.mapper.RowMapper;
 import org.jdbi.v3.core.statement.StatementContext;
 import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
@@ -28,9 +29,18 @@ public interface StationsDao {
                 stationType     = VALUES(stationType),
                 hasLargePad     = VALUES(hasLargePad),
                 hasMediumPad     = VALUES(hasMediumPad),
-                hasSmallPad     = VALUES(hasSmallPad)
+                hasSmallPad     = VALUES(hasSmallPad),
+                dirty           = TRUE
             """)
     void upsert(@BindBean StationsDao.Station data);
+
+    /**
+     * Mark a station as dirty so the next trade pair recalculation
+     * processes its fresh commodity snapshot.
+     * Called by MarketManager.save() after every commodity ingest.
+     */
+    @SqlUpdate("UPDATE stations SET dirty = TRUE WHERE marketId = :marketId")
+    void markDirty(@Bind("marketId") long marketId);
 
 
     class StationMapper implements RowMapper<Station> {

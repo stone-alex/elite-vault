@@ -202,6 +202,9 @@ public class EddnDto extends BaseDto {
     private Double distFromStarLs;          // Distance from arrival / main star in LS (common in Docked/Location)
 
     @SerializedName("MarketID")
+    private Long MarketId;                  // Unique ID for the market / station
+
+    @SerializedName("marketId")
     private Long marketId;                  // Unique ID for the market / station
 
     @SerializedName("StationId")
@@ -275,6 +278,7 @@ public class EddnDto extends BaseDto {
     public List<EDDN_FssSignalDto> getFssSignals() {
         return fssSignals;
     }
+
 
     public String getBody() {
         return body;
@@ -429,11 +433,12 @@ public class EddnDto extends BaseDto {
     }
 
     public Long getMarketId() {
-        return marketId;
+        if (marketId != null) return marketId;
+        return MarketId;
     }
 
     public void setMarketId(Long marketId) {
-        this.marketId = marketId;
+        this.MarketId = marketId;
     }
 
     public String getStationName() {

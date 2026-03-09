@@ -17,6 +17,7 @@ public class API_TradePairDto extends Convertable {
     private int stock;
     private int demand;
     private double distanceLy;
+    private long estimatedProfit;
 
     public String getSourceSystem() {
         return sourceSystem;
@@ -120,5 +121,13 @@ public class API_TradePairDto extends Convertable {
 
     public void setDistanceLy(double distanceLy) {
         this.distanceLy = distanceLy;
+    }
+
+    public void setEstimatedRunProfit(long estimate) {
+        this.estimatedProfit = estimate;
+    }
+
+    public long getEstimatedProfit() {
+        return estimatedProfit;
     }
 }

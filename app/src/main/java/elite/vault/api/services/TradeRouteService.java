@@ -42,7 +42,7 @@ public class TradeRouteService {
             String startSystem = ctx.queryParam("startingLocationStarSystem");
             int numTrades = ctx.queryParamAsClass("numTrades", Integer.class).getOrDefault(1);
             int maxDistanceFromEntrance = ctx.queryParamAsClass("maxDistanceFromEntrance", Integer.class).getOrDefault(6000);
-            int jumpRange = ctx.queryParamAsClass("jumpRange", Integer.class).getOrDefault(6000);
+            int jumpRange = ctx.queryParamAsClass("jumpRange", Integer.class).getOrDefault(250);
             boolean requireLargeLandingPad = ctx.queryParamAsClass("requireLargeLandingPad", Boolean.class).getOrDefault(false);
             boolean requireMediumLandingPad = ctx.queryParamAsClass("requireMediumLandingPad", Boolean.class).getOrDefault(false);
             boolean allowPlanetaryLandings = ctx.queryParamAsClass("allowPlanetaryLandings", Boolean.class).getOrDefault(false);

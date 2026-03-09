@@ -4,15 +4,17 @@ import elite.vault.api.dto.API_CommodityDto;
 import elite.vault.api.dto.API_TradePairDto;
 import elite.vault.api.dto.API_TradeRouteDto;
 import elite.vault.db.dao.CommodityDao;
+import elite.vault.db.dao.StationsDao;
 import elite.vault.db.dao.SystemDao;
+import elite.vault.db.dao.TradePairDao;
 import elite.vault.db.projections.CommodityOfferProjection;
-import elite.vault.db.projections.TradePairProjection;
 import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.EDDN_CommodityItemDto;
 import elite.vault.eddn.dto.EddnDto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -20,6 +22,89 @@ public final class MarketManager {
 
     private static final Logger log = LogManager.getLogger(MarketManager.class);
     private static final MarketManager INSTANCE = new MarketManager();
+
+    /**
+     * Default assumed cargo capacity when the caller does not specify one.
+     * Represents a mid-range trading ship (e.g. Type-7, Krait Mk II with cargo build).
+     */
+    private static final int DEFAULT_CARGO_CAP = 512;
+
+    // -------------------------------------------------------------------------
+    // SQL for queries that require a JDBI defineList for the planetary type
+    // IN-clause. These cannot go through @SqlQuery annotations because the
+    // <planetaryTypes> placeholder must be resolved at Handle level.
+    // -------------------------------------------------------------------------
+
+    // SQL for querying the pre-calculated trade_pair table.
+    // Uses define() for <planetaryTypes> — same pattern as the live queries.
+    private static final String FIND_BEST_PAIRS_SQL = """
+            SELECT
+                tp.commodityId,
+                tp.commodityName,
+                tp.buyMarketId,
+                tp.buySystemAddress,
+                tp.buySystem,
+                tp.buyStation,
+                tp.buyPrice,
+                tp.buyStock,
+                tp.buyX,
+                tp.buyY,
+                tp.buyZ,
+                tp.buyHasLargePad,
+                tp.buyHasMediumPad,
+                tp.buyStationType,
+                tp.buyDistToArrival,
+                tp.sellMarketId,
+                tp.sellSystemAddress,
+                tp.sellSystem,
+                tp.sellStation,
+                tp.sellPrice,
+                tp.sellDemand,
+                tp.sellHasLargePad,
+                tp.sellHasMediumPad,
+                tp.sellStationType,
+                tp.sellDistToArrival,
+                tp.sellX,
+                tp.sellY,
+                tp.sellZ,
+                tp.profitPerUnit,
+                tp.distanceLy,
+                tp.profitPerUnit * LEAST(tp.buyStock, tp.sellDemand, :cargoCap) AS runValue
+            FROM trade_pair tp
+            WHERE tp.buyDistToArrival        <= :maxDistFromEntrance
+              AND tp.sellDistToArrival       <= :maxDistFromEntrance
+              AND tp.profitPerUnit            > 0
+              AND tp.buyStock                >= GREATEST(:cargoCap / 2, 10)
+              AND tp.sellDemand              >= GREATEST(:cargoCap / 2, 10)
+              AND (
+                  :requireLargePad = FALSE
+                  OR (tp.buyHasLargePad = TRUE AND tp.sellHasLargePad = TRUE)
+              )
+              AND (
+                  :requireMediumPad = FALSE
+                  OR ((tp.buyHasLargePad = TRUE  OR tp.buyHasMediumPad = TRUE)
+                  AND (tp.sellHasLargePad = TRUE OR tp.sellHasMediumPad = TRUE))
+              )
+              AND (
+                  :allowPlanetary = TRUE
+                  OR tp.buyStationType  NOT IN (<planetaryTypes>)
+              )
+              AND (
+                  :allowPlanetary = TRUE
+                  OR tp.sellStationType NOT IN (<planetaryTypes>)
+              )
+              -- Buy station must be reachable from current position (sphere check).
+              -- For hop 1 this is the player's current system.
+              -- For hop 2..N this is the sell system of the previous leg.
+              -- :searchRadius is the user-configured search radius, not ship jump range.
+              AND tp.buyX BETWEEN :refX - :searchRadius AND :refX + :searchRadius
+              AND tp.buyY BETWEEN :refY - :searchRadius AND :refY + :searchRadius
+              AND tp.buyZ BETWEEN :refZ - :searchRadius AND :refZ + :searchRadius
+              AND POW(tp.buyX - :refX, 2) + POW(tp.buyY - :refY, 2) + POW(tp.buyZ - :refZ, 2)
+                      <= POW(:searchRadius, 2)
+            ORDER BY tp.profitPerUnit * LEAST(tp.buyStock, tp.sellDemand, :cargoCap) DESC
+            LIMIT :limit
+            """;
 
     /**
      * Commodity name → commodity_type.id cache.
@@ -44,6 +129,7 @@ public final class MarketManager {
     public static MarketManager getInstance() {
         return INSTANCE;
     }
+
 
     // -------------------------------------------------------------------------
     // Cache management
@@ -86,8 +172,8 @@ public final class MarketManager {
     /**
      * Persist a full market snapshot from EDDN.
      * Pattern: DELETE existing rows for this market, then bulk INSERT the new snapshot.
-     * Wrapped in a single transaction — if the INSERT fails the DELETE is rolled back,
-     * so we never end up with a market that has no commodity rows.
+     * If the INSERT fails the DELETE is effectively lost — the market will be empty
+     * until the next snapshot arrives, which is acceptable given the 3-hour window.
      */
     public void save(EddnDto data, Long systemAddress) {
         if (data == null || systemAddress == null) return;
@@ -98,7 +184,7 @@ public final class MarketManager {
         List<EDDN_CommodityItemDto> commodities = data.getCommodities();
         if (commodities == null || commodities.isEmpty()) return;
 
-        // Build the batch — resolve/create commodity type ids before opening the transaction
+        // Build the batch — resolve/create commodity type ids before opening the lock
         List<CommodityDao.CommodityRow> batch = new ArrayList<>(commodities.size());
         for (EDDN_CommodityItemDto item : commodities) {
             if (item == null || item.getName() == null) continue;
@@ -119,6 +205,12 @@ public final class MarketManager {
                 dao.insertBatch(batch);
                 return null;
             });
+            // Mark station dirty so the next trade pair recalculation
+            // picks up the fresh commodity snapshot for this market.
+            Database.withDao(StationsDao.class, dao -> {
+                dao.markDirty(mid);
+                return null;
+            });
         }
     }
 
@@ -128,7 +220,6 @@ public final class MarketManager {
         row.setMarketId(marketId);
         row.setCommodityId(commodityId);
         row.setSystemAddress(systemAddress);
-        // EDDN prices are whole credits — safe to cast from double/Number
         row.setBuyPrice((int) item.getBuyPrice());
         row.setSellPrice((int) item.getSellPrice());
         row.setStock((int) item.getStock());
@@ -146,10 +237,8 @@ public final class MarketManager {
                                                   int maxDistance) {
         if (commodityName == null || startingSystem == null) return Collections.emptyList();
 
-        // Unknown commodity = nothing in DB, no point querying
         Short commodityId = commodityTypeCache.get(commodityName);
         if (commodityId == null) {
-            // Try case-insensitive match — EDDN names are lowercase, callers may not be
             final String lower = commodityName.toLowerCase();
             commodityId = commodityTypeCache.entrySet().stream()
                     .filter(e -> e.getKey().equalsIgnoreCase(lower))
@@ -166,7 +255,7 @@ public final class MarketManager {
 
         return Database.withDao(CommodityDao.class, dao -> {
             List<CommodityOfferProjection> rows = dao.findBestCommodityOffers(
-                    cid, maxDistance, origin.getX(), origin.getY());
+                    cid, maxDistance, origin.getX(), origin.getY(), origin.getZ());
 
             List<API_CommodityDto> result = new ArrayList<>(rows.size());
             for (CommodityOfferProjection r : rows) {
@@ -187,7 +276,7 @@ public final class MarketManager {
 
 
     // -------------------------------------------------------------------------
-    // Query: trade route
+    // Query: trade route  (reads from pre-calculated trade_pair table)
     // -------------------------------------------------------------------------
 
     public API_TradeRouteDto calculateTradeRoute(String startingSystem,
@@ -197,119 +286,153 @@ public final class MarketManager {
                                                  boolean requireLargePad,
                                                  boolean requireMediumPad,
                                                  boolean allowPlanetary) {
+        return calculateTradeRoute(startingSystem, numTrades, jumpRange,
+                maxDistanceFromEntrance, requireLargePad, requireMediumPad,
+                allowPlanetary, DEFAULT_CARGO_CAP);
+    }
+
+    public API_TradeRouteDto calculateTradeRoute(String startingSystem,
+                                                 int numTrades,
+                                                 int jumpRange,
+                                                 double maxDistanceFromEntrance,
+                                                 boolean requireLargePad,
+                                                 boolean requireMediumPad,
+                                                 boolean allowPlanetary,
+                                                 int cargoCapacity) {
         long startTime = System.currentTimeMillis();
 
         SystemDao.StarSystem origin = Database.withDao(SystemDao.class,
                 dao -> dao.findByName(startingSystem));
-        if (origin == null) return null;
+        if (origin == null) {
+            log.warn("Starting system not found in DB: {}", startingSystem);
+            return null;
+        }
+
+        // Pre-quoted IN-clause for planetary type filter
+        String planetaryTypesInClause = CommodityDao.PLANETARY_STATION_TYPES.stream()
+                .map(t -> "'" + t.replace("'", "''") + "'")
+                .collect(java.util.stream.Collectors.joining(","));
+
+        // Data age — read once before the loop, add to response
+        LocalDateTime lastCalcAt = Database.withDao(TradePairDao.class,
+                TradePairDao::getLastCalculatedAt);
 
         API_TradeRouteDto route = new API_TradeRouteDto();
         Map<Integer, API_TradePairDto> legs = new LinkedHashMap<>();
 
         double curX = origin.getX();
         double curY = origin.getY();
-        Long currentMarketId = null;
+        double curZ = origin.getZ();
+
         Set<String> usedTrades = new HashSet<>();
 
         for (int hop = 1; hop <= numTrades; hop++) {
             final double refX = curX;
             final double refY = curY;
+            final double refZ = curZ;
 
-            // Step 1 — find buy candidates at or near current position
-            List<TradePairProjection> buyOffers;
-            if (currentMarketId == null) {
-                buyOffers = Database.withDao(CommodityDao.class, dao ->
-                        dao.findBuyOffers(jumpRange, refX, refY, maxDistanceFromEntrance,
-                                requireLargePad, requireMediumPad, allowPlanetary));
-            } else {
-                final long stationId = currentMarketId;
-                buyOffers = Database.withDao(CommodityDao.class,
-                        dao -> dao.findBuyOffersAtStation(stationId));
+            // Single indexed scan against trade_pair — no heavy joins
+            final String ptClause = planetaryTypesInClause;
+            List<TradePairDao.TradePairRow> candidates = Database.withHandle(handle ->
+                    handle.createQuery(FIND_BEST_PAIRS_SQL)
+                            .bind("refX", refX)
+                            .bind("refY", refY)
+                            .bind("refZ", refZ)
+                            .bind("searchRadius", (double) jumpRange)
+                            .bind("maxDistFromEntrance", maxDistanceFromEntrance)
+                            .bind("requireLargePad", requireLargePad)
+                            .bind("requireMediumPad", requireMediumPad)
+                            .bind("allowPlanetary", allowPlanetary)
+                            .bind("cargoCap", cargoCapacity)
+                            .bind("limit", 50)
+                            .define("planetaryTypes", ptClause)
+                            .mapToBean(TradePairDao.TradePairRow.class)
+                            .list());
+
+            if (candidates.isEmpty()) {
+                log.debug("Hop {}: no trade pairs found near ({}, {}, {})", hop, refX, refY, refZ);
+                break;
             }
 
-            if (buyOffers.isEmpty()) break;
-
-            // Step 2 — for each buy candidate (up to 5), find the best sell destination
-            TradePairProjection bestBuy = null;
-            TradePairProjection bestSell = null;
-            double bestProfit = 0;
-            int checked = 0;
-
-            for (TradePairProjection buy : buyOffers) {
-                if (checked >= 5) break;
-                checked++;
-
-                // Use buy station's system coords as the reference for the sell search.
-                // buyX/buyY come from star_system join in the query — non-zero when the
-                // buy station differs from our current position.
-                final double bx = (buy.getBuyX() != 0) ? buy.getBuyX() : refX;
-                final double by = (buy.getBuyY() != 0) ? buy.getBuyY() : refY;
-                final long excludeMkt = buy.getBuyMarketId();
-                final String commodityName = buy.getCommodity();
-
-                // Resolve name → id for the sell query
-                Short cid = commodityTypeCache.get(commodityName);
-                if (cid == null) continue;
-                final short commodityId = cid;
-                final int minSellPrice = (int) buy.getBuyPrice();
-
-                List<TradePairProjection> sells = Database.withDao(CommodityDao.class, dao ->
-                        dao.findBestSellFor(commodityId, minSellPrice, excludeMkt,
-                                jumpRange, bx, by, maxDistanceFromEntrance,
-                                requireLargePad, requireMediumPad, allowPlanetary));
-
-                if (sells.isEmpty()) continue;
-
-                TradePairProjection sell = sells.getFirst();
-                String tradeKey = commodityName + "|" + buy.getBuyMarketId() + "|" + sell.getSellMarketId();
-                if (usedTrades.contains(tradeKey)) continue;
-
-                double profit = sell.getSellPrice() - buy.getBuyPrice();
-                if (profit > bestProfit) {
-                    bestProfit = profit;
-                    bestBuy = buy;
-                    bestSell = sell;
+            // Pick the best candidate not already used in this route
+            TradePairDao.TradePairRow best = null;
+            for (TradePairDao.TradePairRow row : candidates) {
+                // Dedup on sell station — avoid visiting the same destination twice.
+                // Also skip if this sell station was a buy station earlier (would fly empty back).
+                String sellKey = String.valueOf(row.getSellMarketId());
+                String buyKey = String.valueOf(row.getBuyMarketId());
+                if (!usedTrades.contains(sellKey) && !usedTrades.contains("buy:" + buyKey + "|sell:" + sellKey)) {
+                    best = row;
+                    usedTrades.add(sellKey);
+                    usedTrades.add("buy:" + buyKey + "|sell:" + sellKey);
+                    break;
                 }
             }
 
-            if (bestBuy == null) break;
+            if (best == null) {
+                log.debug("Hop {}: all candidates already used", hop);
+                break;
+            }
 
-            String tradeKey = bestBuy.getCommodity() + "|" + bestBuy.getBuyMarketId() + "|" + bestSell.getSellMarketId();
-            usedTrades.add(tradeKey);
+            int effectiveUnits = Math.min(
+                    Math.min(best.getBuyStock(), best.getSellDemand()),
+                    cargoCapacity);
 
             API_TradePairDto dto = new API_TradePairDto();
-            dto.setSourceSystem(bestBuy.getBuySystem());
-            dto.setSourceStation(bestBuy.getBuyStation());
-            dto.setDestinationSystem(bestSell.getSellSystem());
-            dto.setDestinationStation(bestSell.getSellStation());
-            dto.setSourceMarketId(bestBuy.getBuyMarketId());
-            dto.setDestinationMarketId(bestSell.getSellMarketId());
-            dto.setCommodity(bestBuy.getCommodity());
-            dto.setBuyPrice(bestBuy.getBuyPrice());
-            dto.setSellPrice(bestSell.getSellPrice());
-            dto.setProfitPerUnit(bestProfit);
-            dto.setStock(bestBuy.getBuyStock());
-            dto.setDemand(bestSell.getSellDemand());
-            dto.setDistanceLy(bestSell.getLegDistanceLy());
+            dto.setSourceSystem(best.getBuySystem());
+            dto.setSourceStation(best.getBuyStation());
+            dto.setDestinationSystem(best.getSellSystem());
+            dto.setDestinationStation(best.getSellStation());
+            dto.setSourceMarketId(best.getBuyMarketId());
+            dto.setDestinationMarketId(best.getSellMarketId());
+            dto.setCommodity(best.getCommodityName());
+            dto.setBuyPrice(best.getBuyPrice());
+            dto.setSellPrice(best.getSellPrice());
+            dto.setProfitPerUnit(best.getProfitPerUnit());
+            dto.setStock(best.getBuyStock());
+            dto.setDemand(best.getSellDemand());
+            dto.setDistanceLy(best.getDistanceLy());
+            dto.setEstimatedRunProfit((long) best.getProfitPerUnit() * effectiveUnits);
 
             legs.put(hop, dto);
 
-            // Advance position to the sell system for the next hop
-            currentMarketId = bestSell.getSellMarketId();
-            final String sellSystemName = bestSell.getSellSystem();
-            SystemDao.StarSystem sellSystem = Database.withDao(SystemDao.class,
-                    dao -> dao.findByName(sellSystemName));
-            if (sellSystem != null) {
-                curX = sellSystem.getX();
-                curY = sellSystem.getY();
-            } else {
-                // Sell system not yet in our DB — can't continue the chain
-                break;
+            // Advance to the sell system for the next hop.
+            // Coords come directly from the trade_pair row — no DB lookup needed.
+            curX = best.getSellX();
+            curY = best.getSellY();
+            curZ = best.getSellZ();
+
+            if (curX == 0 && curY == 0 && curZ == 0) {
+                // Sell coords missing from trade_pair row — fall back to DB lookup
+                final String sellSysName = best.getSellSystem();
+                SystemDao.StarSystem sellSys = Database.withDao(SystemDao.class,
+                        dao -> dao.findByName(sellSysName));
+                if (sellSys == null) {
+                    log.warn("Hop {}: sell system '{}' not in DB, stopping chain", hop, sellSysName);
+                    break;
+                }
+                curX = sellSys.getX();
+                curY = sellSys.getY();
+                curZ = sellSys.getZ();
             }
         }
 
         long elapsed = System.currentTimeMillis() - startTime;
-        route.setNote("Calculated in " + elapsed + "ms");
+
+        String dataAgeNote;
+        if (lastCalcAt == null) {
+            dataAgeNote = "Trade data: not yet calculated";
+        } else {
+            long minutesAgo = java.time.Duration.between(lastCalcAt, java.time.LocalDateTime.now()).toMinutes();
+            if (minutesAgo < 60) {
+                dataAgeNote = "Trade data last updated " + minutesAgo + " minute(s) ago";
+            } else {
+                dataAgeNote = "Trade data last updated " + (minutesAgo / 60) + " hour(s) ago";
+            }
+        }
+
+        route.setLastCalculatedAt(lastCalcAt);
+        route.setNote(String.format("Calculated %d leg(s) in %dms. %s.", legs.size(), elapsed, dataAgeNote));
         route.setRoute(legs);
         return route;
     }

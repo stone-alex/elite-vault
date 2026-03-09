@@ -82,6 +82,33 @@ public class Database {
     }
 
     /**
+     * Raw handle query — opens a handle, runs the block, closes it.
+     * Use this when you need access to Handle-level features that aren't
+     * available through @SqlQuery annotations, such as defineList() for
+     * dynamic IN-clauses (e.g. the planetary station type filter).
+     * <p>
+     * Not transactional. If you need atomicity, use withTransaction instead.
+     * <p>
+     * Example:
+     * <pre>
+     *   List<Foo> results = Database.withHandle(handle ->
+     *       handle.createQuery(MY_SQL)
+     *             .bind("x", x)
+     *             .defineList("myList", myList)
+     *             .mapToBean(Foo.class)
+     *             .list());
+     * </pre>
+     */
+    public static <R> R withHandle(Function<Handle, R> block) {
+        try {
+            return JDBI.withHandle(handle -> block.apply(handle));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Handle operation failed", e);
+        }
+    }
+
+    /**
      * Raw handle — caller is responsible for close(). Use sparingly.
      */
     public static Handle init() {

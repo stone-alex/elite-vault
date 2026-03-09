@@ -22,6 +22,12 @@ public class StellarObjectManager {
         return INSTANCE;
     }
 
+    private static boolean isValid(BootstrapEntryDto entry) {
+        if (entry.getSystemAddress() == null) return false;
+        if (entry.getBodyId() == null) return false;
+        return entry.getBodyName() == null;
+    }
+
     public void save(EddnDto data) {
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(data));
@@ -49,7 +55,6 @@ public class StellarObjectManager {
             }
         }
     }
-
 
     public void savePartial(EddnDto data) {
         Database.withDao(StellarObjectDao.class, dao -> {
@@ -133,7 +138,8 @@ public class StellarObjectManager {
         return data;
     }
 
-    public void saveBootStrapData(BootstrapEntryDto entry, String sysName, long sysAddr, double x, double y, double z) {
+    public void saveBootStrapData(BootstrapEntryDto entry, long sysAddr, double x, double y, double z) {
+        if (isValid(entry)) return;
 
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(entry, x, y, z));
@@ -152,7 +158,6 @@ public class StellarObjectManager {
         if (stations != null && !stations.isEmpty()) {
             saveBootstrpStations(stations, entry.getSystemAddress());
         }
-
     }
 
     private void saveBootstrpStations(List<BootstrapEntryDto.Station> stations, Long systemAddress) {
