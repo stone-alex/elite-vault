@@ -17,23 +17,19 @@ public interface SystemDao {
 
     /**
      * Upserts a star system entry.
-     * - Inserts if systemAddress does not exist
-     * - Updates coordinates, name and sector if systemAddress already exists
-     * (latest data wins - typical for EDDN journal entries)
-     * <p>
-     * Uses MariaDB/MySQL native ON DUPLICATE KEY UPDATE syntax.
-     * Requires PRIMARY KEY or UNIQUE constraint on systemAddress (already present).
+     * pos column removed — MySQL 8 spatial is 2D geographic only, not useful
+     * for Elite's Cartesian coordinate space. Plain BETWEEN on x/y/z via
+     * idx_ss_xyz handles all bounding-box queries correctly and faster.
      */
     @SqlUpdate("""
-            INSERT INTO star_system (systemAddress, starName, x, y, z, sector, pos)
-            VALUES (:systemAddress, :starName, :x, :y, :z, :sector, ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')')))
+            INSERT INTO star_system (systemAddress, starName, x, y, z, sector)
+            VALUES (:systemAddress, :starName, :x, :y, :z, :sector)
             ON DUPLICATE KEY UPDATE
                 starName = VALUES(starName),
                 x        = VALUES(x),
                 y        = VALUES(y),
                 z        = VALUES(z),
-                sector   = VALUES(sector),
-                pos      = ST_PointFromText(CONCAT('POINT(', :x, ' ', :y, ')'))
+                sector   = VALUES(sector)
             """)
     void upsert(@BindBean StarSystem data);
 
@@ -61,28 +57,46 @@ public interface SystemDao {
     StarSystem findByAddress(@Bind("systemAddress") long systemAddress);
 
 
+    /**
+     * Find nearby star systems suitable as jump waypoints.
+     * <p>
+     * Used by route planning (trade hops, fleet carrier waypoints).
+     * Pure BETWEEN bounding box on idx_ss_xyz — no spatial functions.
+     * <p>
+     * Parameters:
+     * cx/cy/cz     — current position (center of search sphere)
+     * gx/gy/gz     — goal position (used to order candidates toward destination)
+     * minX..maxZ   — precomputed bounding box (cx ± range)
+     * minDistSq    — exclude systems too close (avoids re-visiting current system)
+     * currentName  — exclude current system by name
+     * <p>
+     * Returns up to 5 systems within 500 ly of current position, ordered by
+     * proximity to the goal position (greedy nearest-to-goal selection).
+     * The 500 ly hard limit (250000.0 = 500^2) matches fleet carrier max hop range;
+     * trade route callers pass a smaller hopDistance so the bounding box naturally
+     * limits candidates before the sphere check.
+     */
     @SqlQuery("""
             WITH candidates AS (
-                    SELECT systemAddress, starName, x, y, z, date, sector,
-                           (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) AS dist_sq
-                    FROM star_system
-                    WHERE
-                        starName != :currentName
-                        AND MBRContains(
-                            ST_Envelope(ST_GeomFromText(CONCAT(
-                                'LINESTRING(', :minX, ' ', :minY, ',', :maxX, ' ', :maxY, ')'))),
-                            pos
-                        )
-                        AND z BETWEEN :minZ AND :maxZ
-                )
-                SELECT systemAddress, starName, x, y, z, date, sector
-                FROM candidates
+                SELECT systemAddress, starName, x, y, z, sector,
+                       (x - :cx)*(x - :cx) + (y - :cy)*(y - :cy) + (z - :cz)*(z - :cz) AS dist_sq
+                FROM star_system
                 WHERE
-                    dist_sq <= 250000.0
-                    AND (:minDistSq <= 0 OR dist_sq >= :minDistSq)
-                    AND (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) <  (:cx - :gx)*(:cx - :gx) + (:cy - :gy)*(:cy - :gy) + (:cz - :gz)*(:cz - :gz)
-                ORDER BY (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) ASC
-                LIMIT 5
+                    starName != :currentName
+                    AND x BETWEEN :minX AND :maxX
+                    AND y BETWEEN :minY AND :maxY
+                    AND z BETWEEN :minZ AND :maxZ
+            )
+            SELECT systemAddress, starName, x, y, z, sector
+            FROM candidates
+            WHERE
+                dist_sq <= 250000.0
+                AND (:minDistSq <= 0 OR dist_sq >= :minDistSq)
+                AND (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz)
+                    < (:cx - :gx)*(:cx - :gx) + (:cy - :gy)*(:cy - :gy) + (:cz - :gz)*(:cz - :gz)
+            ORDER BY
+                (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) ASC
+            LIMIT 5
             """)
     List<StarSystem> findNeighbors(
             @Bind("minX") double minX, @Bind("maxX") double maxX,
@@ -95,15 +109,21 @@ public interface SystemDao {
     );
 
 
+    /**
+     * Find all star systems within a 3D bounding box corridor.
+     * Used to pre-load candidate waypoints along a route before the Java-side
+     * path-finding step narrows them to an actual jump sequence.
+     *
+     * minX..maxZ define the corridor box — caller computes these from the
+     * route endpoints plus a lateral tolerance.
+     */
     @SqlQuery("""
             SELECT systemAddress, starName, x, y, z, sector
             FROM star_system
-            WHERE MBRContains(
-                    ST_Envelope(ST_GeomFromText(CONCAT(
-                        'LINESTRING(', :minX, ' ', :minY, ',', :maxX, ' ', :maxY, ')'))),
-                    pos
-                  )
-              AND z BETWEEN :minZ AND :maxZ
+            WHERE
+                x BETWEEN :minX AND :maxX
+                AND y BETWEEN :minY AND :maxY
+                AND z BETWEEN :minZ AND :maxZ
             """)
     List<StarSystem> findSystemsInCorridor(
             @Bind("minX") double minX, @Bind("maxX") double maxX,
@@ -132,7 +152,6 @@ public interface SystemDao {
         private long systemAddress;
         private String starName;
         private double x, y, z;
-        private String date;
         private String sector;
 
         public long getSystemAddress() {
@@ -175,24 +194,12 @@ public interface SystemDao {
             this.z = z;
         }
 
-        public String getDate() {
-            return date;
-        }
-
-        public void setDate(String date) {
-            this.date = date;
-        }
-
         public String getSector() {
             return sector;
         }
 
         public void setSector(String sector) {
             this.sector = sector;
-        }
-
-        public String getPosWkt() {
-            return String.format("POINT(%f %f)", getX(), getY());
         }
     }
 }

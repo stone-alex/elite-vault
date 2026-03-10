@@ -1,6 +1,8 @@
 package elite.vault.bootstrap;
 
 import com.google.gson.annotations.SerializedName;
+import elite.vault.json.GsonFactory;
+import elite.vault.json.ToJsonConvertible;
 import elite.vault.util.BaseDto;
 
 import java.util.List;
@@ -360,7 +362,7 @@ public class BootstrapEntryDto extends BaseDto {
         }
     }
 
-    public static class Station {
+    public static class Station implements ToJsonConvertible {
         @SerializedName("name")
         private String name;
 
@@ -430,15 +432,7 @@ public class BootstrapEntryDto extends BaseDto {
         }
 
         public String getEconomies() {
-            if (economies == null) {
-                return "";
-            }
-            StringBuilder sb = new StringBuilder();
-            Set<String> set = economies.keySet();
-            set.forEach(s -> {
-                sb.append(s).append(", ");
-            });
-            return sb.toString();
+            return GsonFactory.getGson().toJson(economies);
         }
 
         public String getGovernment() {
@@ -446,14 +440,7 @@ public class BootstrapEntryDto extends BaseDto {
         }
 
         public String getServices() {
-            if (services == null) {
-                return null;
-            }
-            StringBuilder sb = new StringBuilder();
-            services.forEach(s -> {
-                sb.append(s).append(", ");
-            });
-            return sb.toString();
+            return GsonFactory.getGson().toJson(services);
         }
 
         public String getType() {
@@ -466,6 +453,10 @@ public class BootstrapEntryDto extends BaseDto {
 
         public Market getMarket() {
             return market;
+        }
+
+        @Override public String toJson() {
+            return GsonFactory.getGson().toJson(this);
         }
     }
 

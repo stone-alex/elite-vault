@@ -1,8 +1,7 @@
 package elite.vault.db.dao;
 
-import elite.vault.db.projections.BuyCandidateProjection;
 import elite.vault.db.projections.CommodityOfferProjection;
-import elite.vault.db.projections.SellCandidateProjection;
+import elite.vault.db.projections.HopPairProjection;
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
@@ -49,6 +48,38 @@ public interface CommodityDao {
 
 
     // -------------------------------------------------------------------------
+    // Snapshot deduplication gate
+    //
+    // Call checkAndUpdateHash before every DELETE+INSERT cycle.
+    // Returns 1 if the hash was new/changed (proceed with replace).
+    // Returns 0 if the hash matches the stored value (skip replace entirely).
+    //
+    // Uses INSERT ... ON DUPLICATE KEY UPDATE so the check and update are
+    // atomic — no race between the SELECT and the UPDATE under concurrent
+    // ingest from multiple commanders at the same station.
+    //
+    // The hash is computed in Java (CommodityHasher) as a lightweight XOR
+    // across all (commodityId, buyPrice, sellPrice) tuples in the snapshot.
+    // Not cryptographic — change detection only.
+    // -------------------------------------------------------------------------
+
+    @SqlQuery("""
+            SELECT COUNT(*) FROM market_last_seen
+            WHERE marketId = :marketId AND last_hash = :hash
+            """)
+    int isHashUnchanged(@Bind("marketId") long marketId, @Bind("hash") long hash);
+
+    @SqlUpdate("""
+            INSERT INTO market_last_seen (marketId, last_hash, last_updated)
+            VALUES (:marketId, :hash, UNIX_TIMESTAMP())
+            ON DUPLICATE KEY UPDATE
+                last_hash    = VALUES(last_hash),
+                last_updated = VALUES(last_updated)
+            """)
+    void upsertHash(@Bind("marketId") long marketId, @Bind("hash") long hash);
+
+
+    // -------------------------------------------------------------------------
     // Snapshot replace
     // -------------------------------------------------------------------------
 
@@ -63,9 +94,169 @@ public interface CommodityDao {
 
 
     // -------------------------------------------------------------------------
-    // Commodity search (used by CommoditiesService)
+    // Primary route hop query — single query per hop (MySQL 8 window functions)
     //
-    // Bounding box on stations.x/y/z (idx_st_xyz) — no star_system join.
+    // Replaces the old findBuyCandidates + N×findBestSell pattern (up to 21
+    // queries per hop) with a single self-join query.
+    //
+    // Algorithm:
+    //   buy_side CTE  — stations within hopDistance of current ref position
+    //                   that have stock of a commodity for sale. One row per
+    //                   (station, commodity) with buyPrice > 0.
+    //   sell_side CTE — stations within hopDistance*2 of ref position
+    //                   (geometrically: if buy ≤ D from ref, sell ≤ D from buy
+    //                   means sell ≤ 2D from ref) that have demand > 0.
+    //                   The sell box is centered on ref, not on each buy station,
+    //                   which is what makes a single static query possible.
+    //   JOIN          — match buy and sell on commodityId, exclude same market,
+    //                   require sellPrice > buyPrice (profitable).
+    //   ORDER BY      — profitPerUnit * LEAST(stock, demand, cargoCap) DESC
+    //                   ranks by total run value, not just margin per unit.
+    //   LIMIT         — returns top :limit pairs; Java picks the best unused one
+    //                   and advances position to the sell station for the next hop.
+    //
+    // Pad and planetary filters apply to both sides independently.
+    // Fleet carriers are excluded on both sides via stationType != 'FleetCarrier'.
+    // -------------------------------------------------------------------------
+
+    @SqlQuery("""
+            WITH buy_side AS (
+                SELECT
+                    c.commodityId,
+                    ct.name                                                                                 AS commodityName,
+                    c.marketId                                                                              AS buyMarketId,
+                    c.systemAddress                                                                         AS buySystemAddress,
+                    st.realName                                                                             AS buyStation,
+                    c.buyPrice,
+                    c.stock                                                                                 AS buyStock,
+                    st.x                                                                                    AS buyX,
+                    st.y                                                                                    AS buyY,
+                    st.z                                                                                    AS buyZ,
+                    st.hasLargePad                                                                          AS buyHasLargePad,
+                    st.hasMediumPad                                                                         AS buyHasMediumPad,
+                    st.stationType                                                                          AS buyStationType,
+                    st.distanceToArrival                                                                    AS buyDistToArrival,
+                    ROUND(SQRT(POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)), 2)   AS distanceFromRef
+                FROM stations st
+                INNER JOIN commodity      c  ON c.marketId  = st.marketId
+                                            AND c.buyPrice  > 0
+                                            AND c.stock    >= :minStock
+                INNER JOIN commodity_type ct ON ct.id       = c.commodityId
+                WHERE
+                    st.x BETWEEN :refX - :hopDistance AND :refX + :hopDistance
+                    AND st.y BETWEEN :refY - :hopDistance AND :refY + :hopDistance
+                    AND st.z BETWEEN :refZ - :hopDistance AND :refZ + :hopDistance
+                    AND POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)
+                        <= POW(:hopDistance, 2)
+                    AND st.distanceToArrival <= :maxDistToArrival
+                    AND (
+                        :requireLargePad  = FALSE OR st.hasLargePad = TRUE
+                    )
+                    AND (
+                        :requireMediumPad = FALSE OR st.hasLargePad = TRUE OR st.hasMediumPad = TRUE
+                    )
+                    AND (
+                        :allowPlanetary   = TRUE  OR st.stationType NOT IN (<planetaryTypes>)
+                    )
+                    AND st.stationType != 'FleetCarrier'
+            ),
+            sell_side AS (
+                SELECT
+                    c.commodityId,
+                    c.marketId                                                                              AS sellMarketId,
+                    c.systemAddress                                                                         AS sellSystemAddress,
+                    st.realName                                                                             AS sellStation,
+                    c.sellPrice,
+                    c.demand                                                                                AS sellDemand,
+                    st.x                                                                                    AS sellX,
+                    st.y                                                                                    AS sellY,
+                    st.z                                                                                    AS sellZ,
+                    st.hasLargePad                                                                          AS sellHasLargePad,
+                    st.hasMediumPad                                                                         AS sellHasMediumPad,
+                    st.stationType                                                                          AS sellStationType,
+                    st.distanceToArrival                                                                    AS sellDistToArrival
+                FROM stations st
+                INNER JOIN commodity c ON c.marketId  = st.marketId
+                                      AND c.sellPrice > 0
+                                      AND c.demand   >= :minDemand
+                WHERE
+                    -- Sell box is hopDistance*2 from ref.
+                    -- Rationale: buy station is at most hopDistance from ref,
+                    -- sell station is at most hopDistance from buy station,
+                    -- therefore sell station is at most hopDistance*2 from ref.
+                    st.x BETWEEN :refX - :hopDistance * 2 AND :refX + :hopDistance * 2
+                    AND st.y BETWEEN :refY - :hopDistance * 2 AND :refY + :hopDistance * 2
+                    AND st.z BETWEEN :refZ - :hopDistance * 2 AND :refZ + :hopDistance * 2
+                    AND st.distanceToArrival <= :maxDistToArrival
+                    AND (
+                        :requireLargePad  = FALSE OR st.hasLargePad = TRUE
+                    )
+                    AND (
+                        :requireMediumPad = FALSE OR st.hasLargePad = TRUE OR st.hasMediumPad = TRUE
+                    )
+                    AND (
+                        :allowPlanetary   = TRUE  OR st.stationType NOT IN (<planetaryTypes>)
+                    )
+                    AND st.stationType != 'FleetCarrier'
+            )
+            SELECT
+                b.commodityId,
+                b.commodityName,
+                b.buyMarketId,
+                b.buySystemAddress,
+                b.buyStation,
+                b.buyPrice,
+                b.buyStock,
+                b.buyX,
+                b.buyY,
+                b.buyZ,
+                b.buyHasLargePad,
+                b.buyHasMediumPad,
+                b.buyStationType,
+                b.buyDistToArrival,
+                b.distanceFromRef,
+                s.sellMarketId,
+                s.sellSystemAddress,
+                s.sellStation,
+                s.sellPrice,
+                s.sellDemand,
+                s.sellX,
+                s.sellY,
+                s.sellZ,
+                s.sellHasLargePad,
+                s.sellHasMediumPad,
+                s.sellStationType,
+                s.sellDistToArrival,
+                (s.sellPrice - b.buyPrice)                                                                 AS profitPerUnit,
+                ROUND(SQRT(POW(s.sellX - b.buyX, 2) + POW(s.sellY - b.buyY, 2) + POW(s.sellZ - b.buyZ, 2)), 2) AS distanceBuyToSell,
+                (s.sellPrice - b.buyPrice) * LEAST(b.buyStock, s.sellDemand, :cargoCap)                   AS runValue
+            FROM buy_side  b
+            INNER JOIN sell_side s ON s.commodityId  = b.commodityId
+                                  AND s.sellMarketId != b.buyMarketId
+                                  AND s.sellPrice     > b.buyPrice
+            ORDER BY runValue DESC
+            LIMIT :limit
+            """)
+    @RegisterBeanMapper(HopPairProjection.class)
+    List<HopPairProjection> findBestHopPairs(
+            @Bind("refX") double refX,
+            @Bind("refY") double refY,
+            @Bind("refZ") double refZ,
+            @Bind("hopDistance") double hopDistance,
+            @Bind("minStock") int minStock,
+            @Bind("minDemand") int minDemand,
+            @Bind("cargoCap") int cargoCap,
+            @Bind("maxDistToArrival") double maxDistToArrival,
+            @Bind("requireLargePad") boolean requireLargePad,
+            @Bind("requireMediumPad") boolean requireMediumPad,
+            @Bind("allowPlanetary") boolean allowPlanetary,
+            @Define("planetaryTypes") String planetaryTypes,
+            @Bind("limit") int limit
+    );
+
+
+    // -------------------------------------------------------------------------
+    // Commodity search (used by CommoditiesService)
     // -------------------------------------------------------------------------
 
     @SqlQuery("""
@@ -99,146 +290,6 @@ public interface CommodityDao {
             @Bind("refX") double refX,
             @Bind("refY") double refY,
             @Bind("refZ") double refZ
-    );
-
-
-    // -------------------------------------------------------------------------
-    // Route hop query — step 1: find buy candidates
-    //
-    // Bounding box on stations.x/y/z (idx_st_xyz) prunes to stations within
-    // hopDistance. No star_system join — coordinates live on stations directly.
-    // stations(~14k) is far smaller than star_system(763k) so the scan is tiny.
-    // -------------------------------------------------------------------------
-
-    @SqlQuery("""
-            SELECT
-                c.commodityId                                                                           AS commodityId,
-                ct.name                                                                                 AS commodityName,
-                c.marketId                                                                              AS buyMarketId,
-                c.systemAddress                                                                         AS buySystemAddress,
-                st.realName                                                                             AS buyStation,
-                c.buyPrice                                                                              AS buyPrice,
-                c.stock                                                                                 AS buyStock,
-                st.x                                                                                    AS buyX,
-                st.y                                                                                    AS buyY,
-                st.z                                                                                    AS buyZ,
-                st.hasLargePad                                                                          AS buyHasLargePad,
-                st.hasMediumPad                                                                         AS buyHasMediumPad,
-                st.stationType                                                                          AS buyStationType,
-                st.distanceToArrival                                                                    AS buyDistToArrival,
-                ROUND(SQRT(POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)), 2)   AS distanceFromRef
-            FROM stations st
-            INNER JOIN commodity      c  ON c.marketId  = st.marketId
-                                        AND c.buyPrice  > 0
-                                        AND c.stock    >= :minStock
-            INNER JOIN commodity_type ct ON ct.id       = c.commodityId
-            WHERE
-                st.x BETWEEN :refX - :hopDistance AND :refX + :hopDistance
-                AND st.y BETWEEN :refY - :hopDistance AND :refY + :hopDistance
-                AND st.z BETWEEN :refZ - :hopDistance AND :refZ + :hopDistance
-                AND POW(st.x - :refX, 2) + POW(st.y - :refY, 2) + POW(st.z - :refZ, 2)
-                    <= POW(:hopDistance, 2)
-                AND st.distanceToArrival <= :maxDistToArrival
-                AND (
-                    :requireLargePad = FALSE
-                    OR st.hasLargePad = TRUE
-                )
-                AND (
-                    :requireMediumPad = FALSE
-                    OR st.hasLargePad = TRUE
-                    OR st.hasMediumPad = TRUE
-                )
-                AND (
-                    :allowPlanetary = TRUE
-                    OR st.stationType NOT IN (<planetaryTypes>)
-                )
-                AND st.stationType != 'FleetCarrier'
-            ORDER BY c.buyPrice ASC
-            LIMIT :limit
-            """)
-    @RegisterBeanMapper(BuyCandidateProjection.class)
-    List<BuyCandidateProjection> findBuyCandidates(
-            @Bind("refX") double refX,
-            @Bind("refY") double refY,
-            @Bind("refZ") double refZ,
-            @Bind("hopDistance") double hopDistance,
-            @Bind("minStock") int minStock,
-            @Bind("maxDistToArrival") double maxDistToArrival,
-            @Bind("requireLargePad") boolean requireLargePad,
-            @Bind("requireMediumPad") boolean requireMediumPad,
-            @Bind("allowPlanetary") boolean allowPlanetary,
-            @Define("planetaryTypes") String planetaryTypes,
-            @Bind("limit") int limit
-    );
-
-
-    // -------------------------------------------------------------------------
-    // Route hop query — step 2: find best sell destination
-    //
-    // Same pattern — bounding box on stations.x/y/z around the buy station.
-    // No star_system join needed.
-    // -------------------------------------------------------------------------
-
-    @SqlQuery("""
-            SELECT
-                c.marketId                                                                                  AS sellMarketId,
-                c.systemAddress                                                                             AS sellSystemAddress,
-                st.realName                                                                                 AS sellStation,
-                c.sellPrice                                                                                 AS sellPrice,
-                c.demand                                                                                    AS sellDemand,
-                st.x                                                                                        AS sellX,
-                st.y                                                                                        AS sellY,
-                st.z                                                                                        AS sellZ,
-                st.hasLargePad                                                                              AS sellHasLargePad,
-                st.hasMediumPad                                                                             AS sellHasMediumPad,
-                st.stationType                                                                              AS sellStationType,
-                st.distanceToArrival                                                                        AS sellDistToArrival,
-                ROUND(SQRT(POW(st.x - :buyX, 2) + POW(st.y - :buyY, 2) + POW(st.z - :buyZ, 2)), 2)        AS distanceFromBuy
-            FROM stations st
-            INNER JOIN commodity c ON c.marketId    = st.marketId
-                                  AND c.commodityId = :commodityId
-                                  AND c.sellPrice   > :buyPrice
-                                  AND c.demand     >= :minDemand
-                                  AND c.marketId   != :buyMarketId
-            WHERE
-                st.x BETWEEN :buyX - :hopDistance AND :buyX + :hopDistance
-                AND st.y BETWEEN :buyY - :hopDistance AND :buyY + :hopDistance
-                AND st.z BETWEEN :buyZ - :hopDistance AND :buyZ + :hopDistance
-                AND POW(st.x - :buyX, 2) + POW(st.y - :buyY, 2) + POW(st.z - :buyZ, 2)
-                    <= POW(:hopDistance, 2)
-                AND st.distanceToArrival <= :maxDistToArrival
-                AND (
-                    :requireLargePad = FALSE
-                    OR st.hasLargePad = TRUE
-                )
-                AND (
-                    :requireMediumPad = FALSE
-                    OR st.hasLargePad = TRUE
-                    OR st.hasMediumPad = TRUE
-                )
-                AND (
-                    :allowPlanetary = TRUE
-                    OR st.stationType NOT IN (<planetaryTypes>)
-                )
-                AND st.stationType != 'FleetCarrier'
-            ORDER BY c.sellPrice DESC
-            LIMIT 1
-            """)
-    @RegisterBeanMapper(SellCandidateProjection.class)
-    SellCandidateProjection findBestSell(
-            @Bind("commodityId") short commodityId,
-            @Bind("buyMarketId") long buyMarketId,
-            @Bind("buyPrice") int buyPrice,
-            @Bind("buyX") double buyX,
-            @Bind("buyY") double buyY,
-            @Bind("buyZ") double buyZ,
-            @Bind("hopDistance") double hopDistance,
-            @Bind("minDemand") int minDemand,
-            @Bind("maxDistToArrival") double maxDistToArrival,
-            @Bind("requireLargePad") boolean requireLargePad,
-            @Bind("requireMediumPad") boolean requireMediumPad,
-            @Bind("allowPlanetary") boolean allowPlanetary,
-            @Define("planetaryTypes") String planetaryTypes
     );
 
 

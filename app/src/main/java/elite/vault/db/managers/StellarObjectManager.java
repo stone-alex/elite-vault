@@ -162,6 +162,7 @@ public class StellarObjectManager {
 
     private void saveBootstrpStations(List<BootstrapEntryDto.Station> stations, Long systemAddress) {
         for (BootstrapEntryDto.Station station : stations) {
+            if (station.getDistanceToArrival() == null) continue;
             Database.withDao(StationsDao.class, dao -> {
                 StationsDao.Station entity = new StationsDao.Station();
                 entity.setMarketId(station.getId());
@@ -169,17 +170,21 @@ public class StellarObjectManager {
                 entity.setControllingFaction(station.getControllingFaction());
                 entity.setControllingFactionState(station.getControllingFactionState());
                 entity.setDistanceToArrival(station.getDistanceToArrival());
-                entity.setEconomies(station.getEconomies());
                 entity.setRealName(station.getRealName() == null ? station.getName() : station.getRealName());
                 entity.setGovernment(station.getGovernment());
+                entity.setPrimaryEconomy(station.getPrimaryEconomy());
+                entity.setStationType(station.getType());
+
+                // Serialize as JSON arrays — required by JSON column type and functional index.
+                entity.setEconomies(station.toJson());
+                entity.setServices(station.getServices());
+
                 if (station.getLandingPads() != null) {
                     entity.setHasLargePad(station.getLandingPads().getLarge() > 0);
                     entity.setHasMediumPad(station.getLandingPads().getMedium() > 0);
                     entity.setHasSmallPad(station.getLandingPads().getSmall() > 0);
                 }
-                entity.setPrimaryEconomy(station.getPrimaryEconomy());
-                entity.setServices(station.getServices());
-                entity.setStationType(station.getType());
+                // x/y/z default 0 — corrected on next EDDN event for this station.
                 dao.upsert(entity);
                 return Void.TYPE;
             });

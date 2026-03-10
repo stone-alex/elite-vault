@@ -51,7 +51,7 @@
 
 
         <!-- Specific logger levels -->
-        <Logger name="elite.vault" level="error"/>
+        <Logger name="elite.vault" level="info"/>
         <Logger name="elite.vault.util.UnknownEnumLogger"
                 level="error"
                 additivity="false">

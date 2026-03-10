@@ -182,7 +182,7 @@ public class Database {
         String pass = conf.getSystemKey(ConfigManager.DB_PASS);
 
         String jdbcUrl = String.format(
-                "jdbc:mariadb://%s:%s/%s" +
+                "jdbc:mysql://%s:%s/%s" +
                 "?useUnicode=true" +
                 "&characterEncoding=UTF-8" +
                 "&connectionAttributes=program_name:EliteVault" +
@@ -196,9 +196,7 @@ public class Database {
                 "&useLocalSessionState=true" +
                 "&useLocalTransactionState=true" +
                 "&cacheResultSetMetadata=true" +
-                "&maintainTimeStats=false" +
-                "&useMysqlMetadata=true" +
-                "&allowPublicKeyRetrieval=true",
+                "&maintainTimeStats=false",
                 host, port, dbName
         );
 
@@ -228,11 +226,10 @@ public class Database {
 
         try (var h = JDBI.open()) {
             String version = h.createQuery("SELECT VERSION()").mapTo(String.class).one();
-            log.info("Connected to MariaDB version: {} with HikariCP pool (max={}, min={})",
-                    version, config.getMaximumPoolSize(), config.getMinimumIdle());
+            log.info("Connected to MySQL version: {} with HikariCP pool (max={}, min={})", version, config.getMaximumPoolSize(), config.getMinimumIdle());
         } catch (Exception e) {
             throw new RuntimeException(
-                    "MariaDB connection failed. Check host/port/credentials/database existence.\n" +
+                    "MySQL connection failed. Check host/port/credentials/database existence.\n" +
                     "URL was: " + jdbcUrl.replaceAll("(?<=password=)[^&]+", "****"), e);
         }
 

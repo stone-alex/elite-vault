@@ -157,8 +157,10 @@ public class BootstrapImporter {
                 //skip
             } else if ("Star".equalsIgnoreCase(entry.getBodyType())) {
                 SINGLETONS.getStarSystemManager().saveBootStrapData(sysName, sysAddr, x, y, z);
+                log.info("Saved " + entry.getBodyType() + " " + entry.getSystemAddress());
             } else if ("Planet".equalsIgnoreCase(entry.getBodyType())) {
                 SINGLETONS.getStellarObjectManager().saveBootStrapData(entry, sysAddr, x, y, z);
+                log.info("Saved " + entry.getBodyType() + " " + entry.getSystemAddress());
             } else {
                 System.out.println(entry.toJson());
             }

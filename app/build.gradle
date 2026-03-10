@@ -50,7 +50,7 @@ dependencies {
     annotationProcessor "io.javalin.community.openapi:openapi-annotation-processor:${openapiVersion}"
 
     // MariaDB
-    implementation 'org.mariadb.jdbc:mariadb-java-client:3.5.0'
+    implementation 'com.mysql:mysql-connector-j:9.3.0'
 
     // Connection pooling
     implementation 'com.zaxxer:HikariCP:6.2.1'
