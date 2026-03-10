@@ -1,7 +1,6 @@
 package elite.vault.eddn.subscribers;
 
 import com.google.common.eventbus.Subscribe;
-import elite.vault.db.managers.StationManager;
 import elite.vault.eddn.dto.EDDN_JournalDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 import elite.vault.json.GsonFactory;
@@ -10,11 +9,12 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Set;
 
+import static elite.vault.Singletons.SINGLETONS;
+
 public class StationSubscriber {
 
     private static final Logger log = LogManager.getLogger(StationSubscriber.class);
     private static final Set<String> EVENTS = Set.of("Docked", "Location");
-    private final StationManager manager = StationManager.getInstance();
 
     @Subscribe
     public void onEvent(EddnMessageEvent event) {
@@ -30,6 +30,6 @@ public class StationSubscriber {
 
     private void update(EDDN_JournalDto data) {
         log.info("EDDN Station {}", data.getStationName());
-        manager.saveStations(data);
+        SINGLETONS.getStationManager().saveStations(data);
     }
 }

@@ -105,6 +105,8 @@ CREATE EVENT maintain_commodity_partitions_hourly
 
 SET GLOBAL event_scheduler = ON;
 
+/*SPLIT*/
+
 DROP TABLE IF EXISTS system_signals;
 
 /*SPLIT*/
@@ -172,4 +174,3 @@ VALUES ('$MULTIPLAYER_SCENARIO14_TITLE;', 'Low'),
     ('$MULTIPLAYER_SCENARIO77_TITLE;', 'Normal'),
     ('$MULTIPLAYER_SCENARIO78_TITLE;', 'High'),
     ('$MULTIPLAYER_SCENARIO81_TITLE;', 'Hazardous');
-

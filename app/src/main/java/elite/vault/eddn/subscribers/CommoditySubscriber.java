@@ -2,7 +2,6 @@ package elite.vault.eddn.subscribers;
 
 import com.google.common.eventbus.Subscribe;
 import elite.vault.db.dao.SystemDao;
-import elite.vault.db.managers.StarSystemManager;
 import elite.vault.eddn.dto.EDDN_CommodityMessageDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 import elite.vault.json.GsonFactory;
@@ -14,7 +13,6 @@ import static elite.vault.Singletons.SINGLETONS;
 public class CommoditySubscriber {
 
     private static final Logger log = LogManager.getLogger(CommoditySubscriber.class);
-    private final StarSystemManager starSystemManager = StarSystemManager.getInstance();
 
     @Subscribe
     public void onEvent(EddnMessageEvent event) {
@@ -28,7 +26,7 @@ public class CommoditySubscriber {
     }
 
     private void update(EDDN_CommodityMessageDto data) {
-        SystemDao.StarSystem star = starSystemManager.findByName(data.getSystemName());
+        SystemDao.StarSystem star = SINGLETONS.getStarSystemManager().findByName(data.getSystemName());
         if (star == null) {
             log.debug("Commodity update dropped - unknown system: {}", data.getSystemName());
             return;

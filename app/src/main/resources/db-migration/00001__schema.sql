@@ -16,7 +16,7 @@
 
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
-SET COLLATION_CONNECTION = 'utf8mb4_unicode_ci';
+SET COLLATION_CONNECTION = 'utf8mb4_0900_ai_ci';
 
 
 -- ============================================================================
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS commodity_type (
     UNIQUE KEY uk_ct_name(name)
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS star_system (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS stations (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS commodity (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci
+    COLLATE = utf8mb4_0900_ai_ci
     PARTITION BY RANGE (received_at DIV 3600) (
         PARTITION p_future VALUES LESS THAN MAXVALUE
         );
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS market_last_seen (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS stellar_object (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 CREATE TABLE IF NOT EXISTS parents (
@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS parents (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS materials (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -303,7 +303,7 @@ CREATE TABLE IF NOT EXISTS rings (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- ============================================================================
@@ -351,4 +351,4 @@ CREATE TABLE IF NOT EXISTS powerplay_state (
 
 ) ENGINE = InnoDB
     DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    COLLATE = utf8mb4_0900_ai_ci;

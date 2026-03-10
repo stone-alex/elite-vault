@@ -30,7 +30,7 @@ public class DatabaseMigrator {
                 CREATE TABLE IF NOT EXISTS schema_migration (
                     version     VARCHAR(255) PRIMARY KEY,
                     applied_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
                 """);
 
         Set<String> allFiles = findMigrationFiles();
