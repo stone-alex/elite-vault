@@ -158,7 +158,7 @@ for DB connection and port configuration.
 
 ---
 
-### API Overview
+### API Example
 
 Base URL: `http://<host>:8085/api/v1`
 
