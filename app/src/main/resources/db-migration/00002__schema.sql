@@ -104,3 +104,72 @@ CREATE EVENT maintain_commodity_partitions_hourly
 /*SPLIT*/
 
 SET GLOBAL event_scheduler = ON;
+
+DROP TABLE IF EXISTS system_signals;
+
+/*SPLIT*/
+
+CREATE TABLE system_signals (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    systemAddress   BIGINT            NOT NULL,
+    starSystem      VARCHAR(256)      NOT NULL,
+    signalName      VARCHAR(256)      NOT NULL,
+    signalType      VARCHAR(60),
+    ussType         VARCHAR(80),
+    spawningFaction VARCHAR(256),
+    spawningState   VARCHAR(60),
+    threatLevel     TINYINT UNSIGNED,
+    firstSeen       DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lastSeen        DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    confirmedCount  SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    UNIQUE KEY uk_sig(systemAddress, signalName),
+    INDEX idx_sig_system(systemAddress),
+    INDEX idx_sig_usstype(ussType)
+);
+
+/*SPLIT*/
+
+CREATE TABLE pirate_faction_keywords (
+    keyword VARCHAR(60) PRIMARY KEY
+);
+
+/*SPLIT*/
+
+INSERT INTO pirate_faction_keywords (keyword)
+VALUES ('Cartel'),
+    ('Mafia'),
+    ('Syndicate'),
+    ('Camorra'),
+    ('Raiders'),
+    ('Gang'),
+    ('Mob'),
+    ('Clan'),
+    ('Pirates'),
+    ('Brotherhood'),
+    ('Crimson'),
+    ('Purple'),
+    ('Blue'),
+    ('Gold'),
+    ('Silver'),
+    ('Jet'),
+    ('Black'),
+    ('Rats'),
+    ('Posse'),
+    ('Ring'),
+    ('Crew');
+
+/*SPLIT*/
+
+CREATE TABLE res_signal_grades (
+    signalName VARCHAR(100) PRIMARY KEY,
+    grade      VARCHAR(20) NOT NULL
+);
+
+/*SPLIT*/
+
+INSERT INTO res_signal_grades (signalName, grade)
+VALUES ('$MULTIPLAYER_SCENARIO14_TITLE;', 'Low'),
+    ('$MULTIPLAYER_SCENARIO77_TITLE;', 'Normal'),
+    ('$MULTIPLAYER_SCENARIO78_TITLE;', 'High'),
+    ('$MULTIPLAYER_SCENARIO81_TITLE;', 'Hazardous');
+

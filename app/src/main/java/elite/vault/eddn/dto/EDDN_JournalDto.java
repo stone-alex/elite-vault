@@ -6,7 +6,7 @@ import elite.vault.util.BaseDto;
 import java.util.List;
 import java.util.Map;
 
-public class EddnDto extends BaseDto {
+public class EDDN_JournalDto extends BaseDto {
 
     @SerializedName("type")
     private String type;

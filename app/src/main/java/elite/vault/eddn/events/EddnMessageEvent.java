@@ -1,17 +1,12 @@
 package elite.vault.eddn.events;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import elite.vault.eddn.dto.EddnDto;
 
 public record EddnMessageEvent(
         String schemaRef,
-        EddnDto data,
-        JsonNode headerNode  // for uploaderID, software, etc. if needed for audit/provenance
+        String rawJson,
+        JsonNode headerNode
 ) {
-    public String getEventType() {
-        return data.getEvent();
-    }
-
     public boolean isJournal() {
         return schemaRef != null && schemaRef.contains("journal/");
     }
@@ -24,8 +19,8 @@ public record EddnMessageEvent(
         return schemaRef;
     }
 
-    public EddnDto getData() {
-        return data;
+    public String getRawJson() {
+        return rawJson;
     }
 
     public JsonNode getHeaderNode() {

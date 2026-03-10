@@ -4,7 +4,7 @@ import elite.vault.db.dao.StationsDao;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.EDDN_EconomyDto;
-import elite.vault.eddn.dto.EddnDto;
+import elite.vault.eddn.dto.EDDN_JournalDto;
 import elite.vault.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -23,7 +23,7 @@ public class StationManager {
         return INSTANCE;
     }
 
-    public void saveStations(EddnDto data) {
+    public void saveStations(EDDN_JournalDto data) {
         if (data.getMarketId() == null) return;
         if (data.getLandingPads() == null) return;
         if (data.getDistFromStarLs() == null) return;

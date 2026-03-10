@@ -5,7 +5,7 @@ import elite.vault.db.dao.PowerPlayStateDao;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.EDDN_FactionDto;
-import elite.vault.eddn.dto.EddnDto;
+import elite.vault.eddn.dto.EDDN_JournalDto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +21,14 @@ public class StarSystemManager {
         return INSTANCE;
     }
 
-    public void save(EddnDto data) {
+    public void save(EDDN_JournalDto data) {
         Database.withDao(SystemDao.class, dao -> {
             dao.upsert(toEntity(data));
             return Void.TYPE;
         });
     }
 
-    private SystemDao.StarSystem toEntity(EddnDto data) {
+    private SystemDao.StarSystem toEntity(EDDN_JournalDto data) {
         SystemDao.StarSystem entity = new SystemDao.StarSystem();
         entity.setSystemAddress(data.getSystemAddress());
         entity.setStarName(data.getStarSystem());
@@ -105,7 +105,7 @@ public class StarSystemManager {
         );
     }
 
-    public void saveFsdJump(EddnDto data) {
+    public void saveFsdJump(EDDN_JournalDto data) {
         if (data.getSystemAllegiance() == null) return;
 
         Database.withDao(PowerPlayStateDao.class, dao -> {
@@ -137,7 +137,7 @@ public class StarSystemManager {
         return entity;
     }
 
-    private PowerPlayStateDao.PowerPlayState toPowerPlayEntity(EddnDto data) {
+    private PowerPlayStateDao.PowerPlayState toPowerPlayEntity(EDDN_JournalDto data) {
         PowerPlayStateDao.PowerPlayState entity = new PowerPlayStateDao.PowerPlayState();
         entity.setSystemAddress(data.getSystemAddress());
         entity.setSystemAllegiance(data.getSystemAllegiance());

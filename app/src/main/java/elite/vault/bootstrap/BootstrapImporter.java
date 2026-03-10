@@ -5,7 +5,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import elite.vault.eddn.dto.EddnDto;
+import elite.vault.eddn.dto.EDDN_JournalDto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -134,7 +134,7 @@ public class BootstrapImporter {
         double z = coords.path("z").asDouble(0);
 
         // Upsert core system (even if no bodies)
-        EddnDto eddnDto = new EddnDto();
+        EDDN_JournalDto eddnDto = new EDDN_JournalDto();
         eddnDto.setSystemAddress(sysAddr);
         eddnDto.setStarSystem(name);
         eddnDto.setStarPos(List.of(x, y, z));

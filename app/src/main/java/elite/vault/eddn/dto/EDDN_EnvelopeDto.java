@@ -11,7 +11,7 @@ public class EDDN_EnvelopeDto {
     private EDDN_HeaderDto header;
 
     @SerializedName("message")
-    private EddnDto message;
+    private EDDN_JournalDto message;
 
     public String getSchemaRef() {
         return schemaRef;
@@ -29,11 +29,11 @@ public class EDDN_EnvelopeDto {
         this.header = header;
     }
 
-    public EddnDto getMessage() {
+    public EDDN_JournalDto getMessage() {
         return message;
     }
 
-    public void setMessage(EddnDto message) {
+    public void setMessage(EDDN_JournalDto message) {
         this.message = message;
     }
 }

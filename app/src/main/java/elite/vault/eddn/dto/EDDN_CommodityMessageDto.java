@@ -5,6 +5,13 @@ import elite.vault.util.BaseDto;
 
 import java.util.List;
 
+/**
+ * DTO for EDDN commodity/3 schema.
+ * <p>
+ * Schema ref: https://eddn.edcd.io/schemas/commodity/3
+ * <p>
+ * Required fields: systemName, marketId, stationName, commodities
+ */
 public class EDDN_CommodityMessageDto extends BaseDto {
 
     @SerializedName("systemName")
@@ -13,94 +20,54 @@ public class EDDN_CommodityMessageDto extends BaseDto {
     @SerializedName("stationName")
     private String stationName;
 
+    @SerializedName("MarketID")
+    private Long MarketId;
+
     @SerializedName("marketId")
     private Long marketId;
 
-    @SerializedName("stationType")
-    private String stationType;
-
-    @SerializedName("CarrierDockingAccess")
-    private String carrierDockingAccess;
-
-    @SerializedName("economies")
-    private List<EDDN_EconomyDto> economies;
-
-    @SerializedName("prohibited")
-    private List<String> prohibited;
+    @SerializedName("StationName")
+    private String StationName;
 
     @SerializedName("commodities")
     private List<EDDN_CommodityItemDto> commodities;
 
-    // getters + setters – update names to match Java convention
+    @SerializedName("prohibited")
+    private List<String> prohibited;
+
+    @SerializedName("economies")
+    private List<EDDN_EconomyDto> economies;
+
+    @SerializedName("CarrierDockingAccess")
+    private String carrierDockingAccess;
+
     public String getSystemName() {
         return systemName;
     }
 
-    public void setSystemName(String systemName) {
-        this.systemName = systemName;
-    }
-
     public String getStationName() {
-        return stationName;
-    }
-
-    public void setStationName(String stationName) {
-        this.stationName = stationName;
+        if (stationName != null) return stationName;
+        return StationName;
     }
 
     public Long getMarketId() {
-        return marketId;
-    }
-
-    public void setMarketId(Long marketId) {
-        this.marketId = marketId;
-    }
-
-    public String getStationType() {
-        return stationType;
-    }
-
-    public void setStationType(String stationType) {
-        this.stationType = stationType;
-    }
-
-    public List<EDDN_EconomyDto> getEconomies() {
-        return economies;
-    }
-
-    public void setEconomies(List<EDDN_EconomyDto> economies) {
-        this.economies = economies;
-    }
-
-    public List<String> getProhibited() {
-        return prohibited;
-    }
-
-    public void setProhibited(List<String> prohibited) {
-        this.prohibited = prohibited;
+        if (marketId != null) return marketId;
+        return MarketId;
     }
 
     public List<EDDN_CommodityItemDto> getCommodities() {
         return commodities;
     }
 
-    public void setCommodities(List<EDDN_CommodityItemDto> commodities) {
-        this.commodities = commodities;
+    public List<String> getProhibited() {
+        return prohibited;
+    }
+
+    public List<EDDN_EconomyDto> getEconomies() {
+        return economies;
     }
 
     public String getCarrierDockingAccess() {
         return carrierDockingAccess;
-    }
-
-    // Optional: add toString() for easier debugging
-    @Override
-    public String toString() {
-        return "CommodityMessageDto{" +
-                "systemName='" + systemName + '\'' +
-                ", stationName='" + stationName + '\'' +
-                ", marketId=" + marketId +
-                ", stationType='" + stationType + '\'' +
-                ", commoditiesCount=" + (commodities != null ? commodities.size() : 0) +
-                '}';
     }
 }

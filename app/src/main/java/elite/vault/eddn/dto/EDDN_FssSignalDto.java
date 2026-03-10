@@ -2,28 +2,72 @@ package elite.vault.eddn.dto;
 
 import com.google.gson.annotations.SerializedName;
 
+/**
+ * Represents a single signal item within the EDDN fsssignaldiscovered/1 schema.
+ * <p>
+ * Schema: https://eddn.edcd.io/schemas/fsssignaldiscovered/1
+ * <p>
+ * Notes:
+ * - Localised strings (_Localised suffix) are stripped by the EDDN gateway — never present.
+ * - TimeRemaining is disallowed by the schema — never present.
+ * - USSType is only present for USS signals, never for ResourceExtraction signals.
+ * - SpawningFaction / SpawningState / ThreatLevel are only present for USS signals.
+ */
 public class EDDN_FssSignalDto {
-    @SerializedName("SignalName")
-    private String signalName;          // e.g. "$MULTIPLAYER_SCENARIO77_TITLE;", "Trujillo Relay", "Bernhard's Progress"
-
-    @SerializedName("SignalType")
-    private String signalType;          // e.g. "ResourceExtraction", "Installation", "StationCoriolis", "NavBeacon", "StationONeilOrbis"
 
     @SerializedName("timestamp")
-    private String timestamp;           // ISO timestamp per signal, often close to message timestamp
+    private String timestamp;               // ISO date-time, required
+
+    @SerializedName("SignalName")
+    private String signalName;              // required — localisation key e.g. "$MULTIPLAYER_SCENARIO78_TITLE;"
+    // or plain name for fleet carriers / installations
+
+    @SerializedName("SignalType")
+    private String signalType;              // optional — "ResourceExtraction", "FleetCarrier",
+    // "Installation", "NavBeacon", "USS", etc.
 
     @SerializedName("IsStation")
-    private boolean isStation;          // true for station-like signals (e.g. Coriolis, Orbis); absent otherwise
+    private Boolean isStation;             // optional — true for station-like signals
 
-    // Optional / rarer fields that appear in some signals
-    // (e.g. in conflict zones, megaships, beacons – safe to leave nullable)
-    @SerializedName("SignalSubtype")    // Sometimes present for more detail (e.g. "Megaship", "ConflictZone")
-    private String signalSubtype;
+    @SerializedName("USSType")
+    private String ussType;                 // optional — USS signals only, e.g. "$USS_Type_Salvage;"
+    // "$USS_Type_MissionTarget;" is blocked by schema
 
-    @SerializedName("IsWanted")         // Rare, for certain criminal/pirate signals
-    private boolean isWanted;
+    @SerializedName("SpawningFaction")
+    private String spawningFaction;         // optional — USS signals only
 
-    // getters + setters for all
+    @SerializedName("SpawningState")
+    private String spawningState;           // optional — USS signals only
+
+    @SerializedName("SpawningPower")
+    private String spawningPower;           // optional — powerplay context
+
+    @SerializedName("OpposingPower")
+    private String opposingPower;           // optional — powerplay context
+
+    @SerializedName("ThreatLevel")
+    private Integer threatLevel;            // optional — USS threat level integer
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    public boolean isResourceExtractionSite() {
+        return "ResourceExtraction".equals(signalType);
+    }
+
+    // -------------------------------------------------------------------------
+    // Getters / Setters
+    // -------------------------------------------------------------------------
+
+    public String getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
+    }
+
     public String getSignalName() {
         return signalName;
     }
@@ -40,35 +84,58 @@ public class EDDN_FssSignalDto {
         this.signalType = signalType;
     }
 
-    public String getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public boolean getIsStation() {
+    public Boolean getIsStation() {
         return isStation;
     }
 
-    public void setIsStation(boolean isStation) {
+    public void setIsStation(Boolean isStation) {
         this.isStation = isStation;
     }
 
-    public String getSignalSubtype() {
-        return signalSubtype;
+    public String getUssType() {
+        return ussType;
     }
 
-    public void setSignalSubtype(String signalSubtype) {
-        this.signalSubtype = signalSubtype;
+    public void setUssType(String ussType) {
+        this.ussType = ussType;
     }
 
-    public boolean getIsWanted() {
-        return isWanted;
+    public String getSpawningFaction() {
+        return spawningFaction;
     }
 
-    public void setIsWanted(boolean isWanted) {
-        this.isWanted = isWanted;
+    public void setSpawningFaction(String spawningFaction) {
+        this.spawningFaction = spawningFaction;
     }
+
+    public String getSpawningState() {
+        return spawningState;
+    }
+
+    public void setSpawningState(String spawningState) {
+        this.spawningState = spawningState;
+    }
+
+    public String getSpawningPower() {
+        return spawningPower;
+    }
+
+    public void setSpawningPower(String spawningPower) {
+        this.spawningPower = spawningPower;
+    }
+
+    public String getOpposingPower() {
+        return opposingPower;
+    }
+
+    public void setOpposingPower(String opposingPower) {
+        this.opposingPower = opposingPower;
+    }
+
+    public Integer getThreatLevel() {
+        return threatLevel;
+    }
+
+    public void setThreatLevel(Integer threatLevel) {
+        this.threatLevel = threatLevel; }
 }

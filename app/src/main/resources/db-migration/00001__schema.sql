@@ -310,23 +310,23 @@ CREATE TABLE IF NOT EXISTS rings (
 -- Factions
 -- ============================================================================
 
+DROP TABLE IF EXISTS factions;
+
 CREATE TABLE IF NOT EXISTS factions (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     systemAddress BIGINT       NOT NULL,
     factionName   VARCHAR(100) NOT NULL,
-    allegiance    VARCHAR(40)           DEFAULT NULL,
-    government    VARCHAR(60)           DEFAULT NULL,
-    influence     DECIMAL(5, 4)         DEFAULT NULL,
-    factionState  VARCHAR(40)           DEFAULT NULL,
-    happiness     VARCHAR(40)           DEFAULT NULL,
+    allegiance    VARCHAR(40),
+    government    VARCHAR(60),
+    influence     DECIMAL(5, 4),
+    factionState  VARCHAR(40),
+    happiness     VARCHAR(40),
+    isPirate      TINYINT(1)   NOT NULL DEFAULT 0,
     received_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     INDEX idx_factions_system(systemAddress),
-    INDEX idx_factions_name(factionName(40))
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_unicode_ci;
+    INDEX idx_factions_name(factionName),
+    INDEX idx_factions_pirate(isPirate)
+);
 
 
 -- ============================================================================

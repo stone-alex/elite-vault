@@ -4,8 +4,8 @@ import elite.vault.bootstrap.BootstrapEntryDto;
 import elite.vault.db.dao.*;
 import elite.vault.db.util.Database;
 import elite.vault.db.util.TimeUtil;
+import elite.vault.eddn.dto.EDDN_JournalDto;
 import elite.vault.eddn.dto.EDDN_MaterialDto;
-import elite.vault.eddn.dto.EddnDto;
 
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,7 @@ public class StellarObjectManager {
         return entry.getBodyName() == null;
     }
 
-    public void save(EddnDto data) {
+    public void save(EDDN_JournalDto data) {
         Database.withDao(StellarObjectDao.class, dao -> {
             dao.upsert(toEntity(data));
             return Void.TYPE;
@@ -56,7 +56,7 @@ public class StellarObjectManager {
         }
     }
 
-    public void savePartial(EddnDto data) {
+    public void savePartial(EDDN_JournalDto data) {
         Database.withDao(StellarObjectDao.class, dao -> {
             StellarObjectDao.StellarObject entity = dao.findBy(data.getSystemAddress(), data.getBodyId());
             if (entity == null) {
@@ -82,7 +82,7 @@ public class StellarObjectManager {
         }
     }
 
-    private StellarObjectDao.StellarObject toEntity(EddnDto dto) {
+    private StellarObjectDao.StellarObject toEntity(EDDN_JournalDto dto) {
         StellarObjectDao.StellarObject data = new StellarObjectDao.StellarObject();
         data.setTimestamp(TimeUtil.toEntityDateTime(dto.getTimestamp()));
         data.setBodyId(dto.getBodyId());

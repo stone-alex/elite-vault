@@ -10,7 +10,7 @@ import elite.vault.db.projections.CommodityOfferProjection;
 import elite.vault.db.projections.HopPairProjection;
 import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.EDDN_CommodityItemDto;
-import elite.vault.eddn.dto.EddnDto;
+import elite.vault.eddn.dto.EDDN_CommodityMessageDto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -87,7 +87,7 @@ public final class MarketManager {
     // Ingest
     // -------------------------------------------------------------------------
 
-    public void save(EddnDto data, Long systemAddress) {
+    public void save(EDDN_CommodityMessageDto data, Long systemAddress) {
         if (data == null || systemAddress == null) return;
         Long marketId = data.getMarketId();
         if (marketId == null) return;
