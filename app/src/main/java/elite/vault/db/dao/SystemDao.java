@@ -96,7 +96,7 @@ public interface SystemDao {
                     < (:cx - :gx)*(:cx - :gx) + (:cy - :gy)*(:cy - :gy) + (:cz - :gz)*(:cz - :gz)
             ORDER BY
                 (x - :gx)*(x - :gx) + (y - :gy)*(y - :gy) + (z - :gz)*(z - :gz) ASC
-            LIMIT 5
+            LIMIT 100
             """)
     List<StarSystem> findNeighbors(
             @Bind("minX") double minX, @Bind("maxX") double maxX,

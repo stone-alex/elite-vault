@@ -32,11 +32,21 @@ public class ApiServer {
             }));
 
             /// Routes
-            config.routes.get("/api/v1/health", ctx -> ctx.result("OK"));
-            config.routes.get("/api/v1/search/commodities", CommoditiesService::searchCommodities);
-            config.routes.get("/api/v1/search/carrier/route", CarrierRouteService::findCarrierRoute);
-            config.routes.get("/api/v1/search/traderoute", TradeRouteService::calculateTradeRoute);
-            config.routes.get("/api/v1/pirate/hunting-grounds", PirateHuntingService::findHuntingGrounds);
+            // Carrier route
+            config.routes.post("/api/v1/search/carrier/route", CarrierRouteService::queueCarrierRoute);
+            config.routes.get("/api/v1/search/carrier/route/{job}", CarrierRouteService::getCarrierRoute);
+
+            // Trade route
+            config.routes.post("/api/v1/search/traderoute", TradeRouteService::queueTradeRoute);
+            config.routes.get("/api/v1/search/traderoute/{job}", TradeRouteService::getTradeRoute);
+
+            // Commodities
+            config.routes.post("/api/v1/search/commodities", CommoditiesService::queueCommoditySearch);
+            config.routes.get("/api/v1/search/commodities/{job}", CommoditiesService::getCommoditySearch);
+
+            // Pirate hunting
+            config.routes.post("/api/v1/pirate/hunting-grounds", PirateHuntingService::queueHuntingGrounds);
+            config.routes.get("/api/v1/pirate/hunting-grounds/{job}", PirateHuntingService::getHuntingGrounds);
 
             /// error
             config.routes.exception(Exception.class, (e, ctx) -> {

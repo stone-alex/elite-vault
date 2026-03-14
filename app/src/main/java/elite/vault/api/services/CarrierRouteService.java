@@ -1,5 +1,7 @@
 package elite.vault.api.services;
 
+import elite.vault.api.jobs.JobDtos;
+import elite.vault.api.jobs.JobStore;
 import elite.vault.db.dao.SystemDao;
 import elite.vault.db.managers.StarSystemManager;
 import io.javalin.http.Context;
@@ -16,127 +18,133 @@ import static elite.vault.util.NumUtils.getIntSafely;
 public class CarrierRouteService {
 
     private static final double CARRIER_MAX_JUMP_LY = 500.0;
-    private static final double CARRIER_MAX_JUMP_SQ = CARRIER_MAX_JUMP_LY * CARRIER_MAX_JUMP_LY;
+    private static final int MAX_HOPS = 5000;
     private static final Logger log = LogManager.getLogger(CarrierRouteService.class);
 
+    private static final JobStore<RouteResponse> JOB_STORE = new JobStore<>("carrier-route", 2);
+
+    // -------------------------------------------------------------------------
+    // POST /api/v1/search/carrier/route
+    // -------------------------------------------------------------------------
     @OpenApi(
-            summary = "Find optimal fleet carrier route",
-            description = "Computes the shortest carrier route (fewest jumps ≤ 500 ly each) " +
-                    "between two star systems using local EDDN stellar data. " +
-                    "Uses A* with admissible heuristic for optimality. " +
-                    "Systems must exist in your vault (primary stars only).",
-            operationId = "findCarrierRoute",
+            summary = "Queue a fleet carrier route calculation",
+            description = "Queues an async carrier route job. Returns a job ID immediately. " +
+                    "Poll GET /api/v1/search/carrier/route/{job} for results.",
+            operationId = "queueCarrierRoute",
             tags = {"Navigation", "Carrier"},
             path = "/api/v1/search/carrier/route",
-            methods = {HttpMethod.GET},
+            methods = {HttpMethod.POST},
             queryParams = {
-                    @OpenApiParam(name = "from", required = true, description = "Starting system name (e.g. Sol)"),
-                    @OpenApiParam(name = "to", required = true, description = "Destination system name (e.g. Colonia)"),
-                    @OpenApiParam(name = "jumpRange", required = true, type = Integer.class, description = "Distance in ly between jumps. Lower numbers are more accurate but slower")
-
+                    @OpenApiParam(name = "from", required = true, description = "Starting system name"),
+                    @OpenApiParam(name = "to", required = true, description = "Destination system name"),
+                    @OpenApiParam(name = "jumpRange", required = false, type = Integer.class,
+                            description = "Max jump distance in ly (≤ 500, default 450)")
             },
             responses = {
-                    @OpenApiResponse(status = "200", description = "Route found",
-                            content = {@OpenApiContent(from = RouteResponse.class)}),
+                    @OpenApiResponse(status = "202", description = "Job queued",
+                            content = {@OpenApiContent(from = JobDtos.JobAcceptedResponse.class)}),
                     @OpenApiResponse(status = "400", description = "Missing parameters",
-                            content = {@OpenApiContent(from = ErrorResponse.class)}),
-                    @OpenApiResponse(status = "404", description = "System not found or no route exists",
-                            content = {@OpenApiContent(from = ErrorResponse.class)}),
-                    @OpenApiResponse(status = "500", description = "Internal error",
-                            content = {@OpenApiContent(from = ErrorResponse.class)})
+                            content = {@OpenApiContent(from = JobDtos.JobErrorResponse.class)})
             }
     )
-    public static void findCarrierRoute(Context ctx) {
+    public static void queueCarrierRoute(Context ctx) {
         String from = ctx.queryParam("from");
         String to = ctx.queryParam("to");
         int jumpRange = getIntSafely(ctx.queryParam("jumpRange"));
-        if (jumpRange == 0) jumpRange = 450;
-        if (jumpRange > 500) jumpRange = 450;
+        if (jumpRange <= 0 || jumpRange > 500) jumpRange = 450;
 
-        if (from == null || from.trim().isEmpty() || to == null || to.trim().isEmpty()) {
+        if (from == null || from.isBlank() || to == null || to.isBlank()) {
             ctx.status(HttpStatus.BAD_REQUEST).json(
-                    new ErrorResponse("Missing or empty 'from' and/or 'to' parameters")
-            );
+                    new JobDtos.JobErrorResponse("Missing or empty 'from' and/or 'to' parameters"));
             return;
         }
 
-        StarSystemManager mgr = SINGLETONS.getStarSystemManager();
+        final String fromFinal = from.trim();
+        final String toFinal = to.trim();
+        final int jumpFinal = jumpRange;
 
-        try {
-            SystemDao.StarSystem start = mgr.findByName(from.trim());
-            SystemDao.StarSystem goal = mgr.findByName(to.trim());
-
-            if (start == null) {
-                ctx.status(HttpStatus.NOT_FOUND).json(new ErrorResponse("Start system not found in vault: " + from));
-                return;
-            }
-            if (goal == null) {
-                ctx.status(HttpStatus.NOT_FOUND).json(new ErrorResponse("Destination system not found in vault: " + to));
-                return;
-            }
-
-            if (start.getStarName().equals(goal.getStarName())) {
-                ctx.json(new RouteResponse(
-                        from, to, 0,
-                        List.of(start.getStarName()),
-                        "Same system – no jumps required"
-                ));
-                return;
-            }
-            long startTime = System.currentTimeMillis();
-            RouteResult result = computeRoute(jumpRange, start, goal, mgr);
-            long endTime = System.currentTimeMillis();
-
-            ctx.json(new RouteResponse(
-                    from, to, result.jumps(),
-                    result.path(),
-                    result.jumps() > 0 ? "Route calculated in " + ((endTime - startTime) / 1000) + " seconds." : "No route found (possibly disconnected at 500 ly range to to lack of available data. try smaller jump range)"
-            ));
-
-        } catch (Exception e) {
-            ctx.status(HttpStatus.INTERNAL_SERVER_ERROR).json(new ErrorResponse("Route calculation failed: " + e.getMessage()));
-        }
+        String jobId = JOB_STORE.submit(() -> computeRoute(fromFinal, toFinal, jumpFinal));
+        ctx.status(HttpStatus.ACCEPTED).json(new JobDtos.JobAcceptedResponse(jobId));
     }
 
-    private static RouteResult computeRoute(Integer jumpRange, SystemDao.StarSystem start, SystemDao.StarSystem goal, StarSystemManager mgr) {
+    // -------------------------------------------------------------------------
+    // GET /api/v1/search/carrier/route/{job}
+    // -------------------------------------------------------------------------
+    @OpenApi(
+            summary = "Poll for carrier route result",
+            description = "Returns 202 while calculating. Returns 200 with route when complete — job flushed on delivery. " +
+                    "Returns 404 if job unknown or expired.",
+            operationId = "getCarrierRoute",
+            tags = {"Navigation", "Carrier"},
+            path = "/api/v1/search/carrier/route/{job}",
+            methods = {HttpMethod.GET},
+            pathParams = {
+                    @OpenApiParam(name = "job", required = true, description = "Job ID returned by POST")
+            },
+            responses = {
+                    @OpenApiResponse(status = "200", description = "Route ready",
+                            content = {@OpenApiContent(from = RouteResponse.class)}),
+                    @OpenApiResponse(status = "202", description = "Still calculating",
+                            content = {@OpenApiContent(from = JobDtos.JobAcceptedResponse.class)}),
+                    @OpenApiResponse(status = "404", description = "Job not found or expired",
+                            content = {@OpenApiContent(from = JobDtos.JobErrorResponse.class)})
+            }
+    )
+    public static void getCarrierRoute(Context ctx) {
+        String jobId = ctx.pathParam("job");
+        JobStore.Job<RouteResponse> job = JOB_STORE.poll(jobId);
 
-        // === Phase 1: Bulk-load all systems in a corridor ===
-        double corridorPadding = CARRIER_MAX_JUMP_LY; // extra width around the straight line
-        double minX = Math.min(start.getX(), goal.getX()) - corridorPadding;
-        double maxX = Math.max(start.getX(), goal.getX()) + corridorPadding;
-        double minY = Math.min(start.getY(), goal.getY()) - corridorPadding;
-        double maxY = Math.max(start.getY(), goal.getY()) + corridorPadding;
-        double minZ = Math.min(start.getZ(), goal.getZ()) - corridorPadding;
-        double maxZ = Math.max(start.getZ(), goal.getZ()) + corridorPadding;
-
-        log.info("Loading corridor systems...");
-        long loadStart = System.currentTimeMillis();
-        List<SystemDao.StarSystem> corridor = mgr.findSystemsInCorridor(minX, maxX, minY, maxY, minZ, maxZ);
-        long loadEnd = System.currentTimeMillis();
-        log.info("Loaded {} systems in {}ms", corridor.size(), loadEnd - loadStart);
-
-        if (corridor.isEmpty()) {
-            return new RouteResult(List.of(), -1);
+        if (job == null) {
+            ctx.status(HttpStatus.NOT_FOUND).json(
+                    new JobDtos.JobErrorResponse("Job not found or expired: " + jobId));
+            return;
+        }
+        if (!job.isDone()) {
+            ctx.status(HttpStatus.ACCEPTED).json(new JobDtos.JobAcceptedResponse(jobId));
+            return;
         }
 
-        // Build a lookup by name and ensure start/goal are present
-        Map<String, SystemDao.StarSystem> byName = new HashMap<>(corridor.size());
-        for (SystemDao.StarSystem s : corridor) {
-            byName.put(s.getStarName(), s);
-        }
-        byName.putIfAbsent(start.getStarName(), start);
-        byName.putIfAbsent(goal.getStarName(), goal);
+        JOB_STORE.flush(jobId);
 
-        // === Phase 2: Build spatial grid for fast neighbor lookups in memory ===
-        double cellSize = CARRIER_MAX_JUMP_LY;
-        Map<Long, List<SystemDao.StarSystem>> grid = new HashMap<>();
-        for (SystemDao.StarSystem s : byName.values()) {
-            long key = gridKey(s.getX(), s.getY(), s.getZ(), cellSize);
-            grid.computeIfAbsent(key, k -> new ArrayList<>()).add(s);
+        if (job.isFailed()) {
+            ctx.status(HttpStatus.INTERNAL_SERVER_ERROR).json(
+                    new JobDtos.JobErrorResponse(job.getError()));
+            return;
         }
+        ctx.status(HttpStatus.OK).json(job.getResult());
+    }
 
-        // === Phase 3: Greedy walk with backtracking - entirely in memory ===
+    // -------------------------------------------------------------------------
+    // Computation
+    // -------------------------------------------------------------------------
+    private static RouteResponse computeRoute(String from, String to, int jumpRange) {
+        StarSystemManager mgr = SINGLETONS.getStarSystemManager();
+
+        SystemDao.StarSystem start = mgr.findByName(from);
+        SystemDao.StarSystem goal = mgr.findByName(to);
+
+        if (start == null)
+            return new RouteResponse(from, to, 0, List.of(), "Start system not found in vault: " + from);
+        if (goal == null)
+            return new RouteResponse(from, to, 0, List.of(), "Destination system not found in vault: " + to);
+        if (start.getStarName().equals(goal.getStarName()))
+            return new RouteResponse(from, to, 0, List.of(), "Same system – no jumps required");
+
+        long startTime = System.currentTimeMillis();
+        RouteResult result = search(jumpRange, start, goal, mgr);
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        String note = result.jumps() > 0
+                ? "Route calculated in " + elapsed + "ms"
+                : "No route found – insufficient data coverage at " + jumpRange + " ly. Try a larger jump range.";
+
+        return new RouteResponse(from, to, result.jumps(), result.path(), note);
+    }
+
+    private static RouteResult search(int jumpRange, SystemDao.StarSystem start,
+                                      SystemDao.StarSystem goal, StarSystemManager mgr) {
         double minDistSq = (double) jumpRange * jumpRange;
+
         List<String> path = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         Deque<BacktrackFrame> backtrackStack = new ArrayDeque<>();
@@ -152,19 +160,24 @@ public class CarrierRouteService {
                 return new RouteResult(path, path.size());
             }
 
-            // Find neighbors from grid (in memory - microseconds, not seconds)
             double effectiveMinDistSq = (remainingLy > CARRIER_MAX_JUMP_LY * 1.5) ? minDistSq : 0.0;
-            List<SystemDao.StarSystem> candidates = findNeighborsInMemory(
-                    current, goal, grid, cellSize, effectiveMinDistSq, visited
+            double range = CARRIER_MAX_JUMP_LY;
+
+            List<SystemDao.StarSystem> candidates = mgr.findNeighbors(
+                    current.getX() - range, current.getX() + range,
+                    current.getY() - range, current.getY() + range,
+                    current.getZ() - range, current.getZ() + range,
+                    current.getX(), current.getY(), current.getZ(),
+                    goal.getX(), goal.getY(), goal.getZ(),
+                    effectiveMinDistSq,
+                    current.getStarName()
             );
 
+            candidates.removeIf(s -> visited.contains(s.getStarName()));
             SystemDao.StarSystem next = candidates.isEmpty() ? null : candidates.getFirst();
 
             if (next == null) {
-                // Dead end - backtrack
-                if (backtrackStack.isEmpty()) {
-                    return new RouteResult(List.of(), -1);
-                }
+                if (backtrackStack.isEmpty()) return new RouteResult(List.of(), -1);
                 BacktrackFrame frame = backtrackStack.peek();
                 boolean found = false;
                 for (int i = frame.nextCandidateIdx; i < frame.candidates.size(); i++) {
@@ -182,11 +195,8 @@ public class CarrierRouteService {
                 if (!found) {
                     backtrackStack.pop();
                     if (!path.isEmpty()) path.removeLast();
-                    if (backtrackStack.isEmpty()) {
-                        return new RouteResult(List.of(), -1);
-                    }
+                    if (backtrackStack.isEmpty()) return new RouteResult(List.of(), -1);
                     current = backtrackStack.peek().system;
-                    continue;
                 }
             } else {
                 backtrackStack.push(new BacktrackFrame(current, candidates, 1));
@@ -195,89 +205,11 @@ public class CarrierRouteService {
                 path.add(current.getStarName());
             }
 
-            if (path.size() > 5000) {
-                log.warn("Route search exceeded 5000 hops, aborting");
+            if (path.size() > MAX_HOPS) {
+                log.warn("Route search exceeded {} hops, aborting", MAX_HOPS);
                 return new RouteResult(List.of(), -1);
             }
         }
-    }
-
-    /**
-     * In-memory neighbor search using spatial grid. Returns candidates sorted by
-     * distance-to-goal ascending (closest to goal first), filtered by forward-cone
-     * and jump range constraints.
-     */
-    private static List<SystemDao.StarSystem> findNeighborsInMemory(
-            SystemDao.StarSystem current,
-            SystemDao.StarSystem goal,
-            Map<Long, List<SystemDao.StarSystem>> grid,
-            double cellSize,
-            double minDistSq,
-            Set<String> visited
-    ) {
-        double cx = current.getX(), cy = current.getY(), cz = current.getZ();
-        double gx = goal.getX(), gy = goal.getY(), gz = goal.getZ();
-        double currentToGoalSq = (cx - gx) * (cx - gx) + (cy - gy) * (cy - gy) + (cz - gz) * (cz - gz);
-
-        int cellRadius = 1; // 500 ly jump / 500 ly cell = check adjacent cells
-        int baseCX = (int) Math.floor(cx / cellSize);
-        int baseCY = (int) Math.floor(cy / cellSize);
-        int baseCZ = (int) Math.floor(cz / cellSize);
-
-        List<SystemDao.StarSystem> result = new ArrayList<>();
-
-        for (int dx = -cellRadius; dx <= cellRadius; dx++) {
-            for (int dy = -cellRadius; dy <= cellRadius; dy++) {
-                for (int dz = -cellRadius; dz <= cellRadius; dz++) {
-                    long key = packKey(baseCX + dx, baseCY + dy, baseCZ + dz);
-                    List<SystemDao.StarSystem> cell = grid.get(key);
-                    if (cell == null) continue;
-
-                    for (SystemDao.StarSystem s : cell) {
-                        if (visited.contains(s.getStarName())) continue;
-
-                        double ddx = s.getX() - cx, ddy = s.getY() - cy, ddz = s.getZ() - cz;
-                        double distSq = ddx * ddx + ddy * ddy + ddz * ddz;
-
-                        if (distSq > CARRIER_MAX_JUMP_SQ) continue;  // too far to jump
-                        if (distSq < minDistSq) continue;            // too short (wasteful hop)
-
-                        // Forward-cone: neighbor must be closer to goal than current
-                        double neighToGoalSq = (s.getX() - gx) * (s.getX() - gx)
-                                + (s.getY() - gy) * (s.getY() - gy)
-                                + (s.getZ() - gz) * (s.getZ() - gz);
-                        if (neighToGoalSq >= currentToGoalSq) continue;
-
-                        result.add(s);
-                    }
-                }
-            }
-        }
-
-        // Sort by distance to goal (best candidates first)
-        result.sort(Comparator.comparingDouble(s -> {
-            double ddx = s.getX() - gx, ddy = s.getY() - gy, ddz = s.getZ() - gz;
-            return ddx * ddx + ddy * ddy + ddz * ddz;
-        }));
-
-        // Keep top candidates for backtracking
-        if (result.size() > 5) {
-            return result.subList(0, 5);
-        }
-        return result;
-    }
-
-    private static long gridKey(double x, double y, double z, double cellSize) {
-        return packKey(
-                (int) Math.floor(x / cellSize),
-                (int) Math.floor(y / cellSize),
-                (int) Math.floor(z / cellSize)
-        );
-    }
-
-    private static long packKey(int ix, int iy, int iz) {
-        // Pack 3 ints into a long: 21 bits each (enough for ±1M range with 500 ly cells)
-        return ((long) (ix & 0x1FFFFF) << 42) | ((long) (iy & 0x1FFFFF) << 21) | (iz & 0x1FFFFF);
     }
 
     private static double dist3d(SystemDao.StarSystem a, SystemDao.StarSystem b) {
@@ -299,17 +231,7 @@ public class CarrierRouteService {
         }
     }
 
-    // DTOs for clean JSON
-    public record RouteResponse(
-            String from,
-            String to,
-            int jumps,
-            List<String> route,
-            String note
-    ) {
-    }
-
-    public record ErrorResponse(String error) {
+    public record RouteResponse(String from, String to, int jumps, List<String> route, String note) {
     }
 
     private record RouteResult(List<String> path, int jumps) {
