@@ -23,7 +23,7 @@ public class EDDN_FssSignalMessageDto extends BaseDto {
     private String starSystem;          // required
 
     @SerializedName("StarPos")
-    private List<Double> starPos;       // required — [x, y, z]
+    private List<Double> starPos;       // required - [x, y, z]
 
     @SerializedName("signals")
     private List<EDDN_FssSignalDto> signals;  // required, minItems 1

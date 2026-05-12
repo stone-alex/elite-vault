@@ -7,7 +7,7 @@ import java.util.List;
  * <p>
  * Purpose: EDDN delivers market snapshots whenever a commander docks.
  * If 4 commanders dock at the same station within a few seconds, the ingest
- * layer receives 4 identical snapshots — each would trigger a full
+ * layer receives 4 identical snapshots - each would trigger a full
  * DELETE + bulk INSERT against the partitioned commodity table.
  * <p>
  * This hasher produces a long from the snapshot contents. The ingest layer

@@ -29,7 +29,7 @@ public class StationManager {
         if (data.getDistFromStarLs() == null) return;
         if (data.getSystemAddress() == null) return;
 
-        // Resolve coordinates — must happen before the station upsert.
+        // Resolve coordinates - must happen before the station upsert.
         // If the system hasn't arrived via EDDN yet we drop this station;
         // it will arrive again the next time a pilot visits and by then the
         // system will likely be known.
@@ -37,7 +37,7 @@ public class StationManager {
                 dao -> dao.findByAddress(data.getSystemAddress()));
 
         if (system == null) {
-            log.debug("Station dropped — system {} not yet in DB (station: {})",
+            log.debug("Station dropped - system {} not yet in DB (station: {})",
                     data.getSystemAddress(), data.getStationName());
             return;
         }
@@ -48,7 +48,7 @@ public class StationManager {
         // Example output: [{"Name":"$economy_Industrial;","Proportion":0.7}, ...]
         String economiesJson = toJson(data.getEconomies());
 
-        // Services is a plain list of strings from EDDN — serialize as JSON array.
+        // Services is a plain list of strings from EDDN - serialize as JSON array.
         // Example output: ["Commodities","Refuel","Repair"]
         String servicesJson = toJson(data.getStationServices());
 
@@ -72,7 +72,7 @@ public class StationManager {
         entity.setHasSmallPad(
                 data.getLandingPads().getSmall() != null && data.getLandingPads().getSmall() > 0);
 
-        // Coordinates copied from star_system — stored on stations to avoid
+        // Coordinates copied from star_system - stored on stations to avoid
         // the join in hot route queries.
         entity.setX(system.getX());
         entity.setY(system.getY());
@@ -97,7 +97,7 @@ public class StationManager {
 
     /**
      * Builds a station entity for the bootstrap importer path.
-     * economies and services come from Spansh dump data — already typed as
+     * economies and services come from Spansh dump data - already typed as
      * List<EDDN_EconomyDto> and List<String> respectively in BootstrapEntryDto.
      * Serialized to JSON here for consistency with the EDDN ingest path.
      */

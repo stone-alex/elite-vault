@@ -14,7 +14,7 @@ public class API_HuntingGroundDto extends Convertable {
     private List<String> resGrades;
     private List<String> pirateFactions;
     private int confirmedCount;
-    private String lastSeen;                        // ISO string — e.g. "2026-03-10T01:43:45"
+    private String lastSeen;                        // ISO string - e.g. "2026-03-10T01:43:45"
     private List<API_MissionProviderDto> missionProviders;
 
     public String getSystemName() {

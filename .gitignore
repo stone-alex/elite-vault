@@ -1,2 +1,17 @@
 .idea
 .idea/*
+
+# Gradle build outputs
+build/
+app/build/
+.gradle/
+
+# Distribution — keep installer.sh, ignore built artifacts
+distribution/*.jar
+distribution/logs/
+
+# Scratch / temp
+scratch/
+
+# OS
+.DS_Store

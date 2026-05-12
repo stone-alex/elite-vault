@@ -7,7 +7,6 @@ import elite.vault.db.util.Database;
 import elite.vault.eddn.dto.EDDN_FactionDto;
 import elite.vault.eddn.dto.EDDN_JournalDto;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class StarSystemManager {
@@ -42,30 +41,9 @@ public class StarSystemManager {
         return entity;
     }
 
-    public void saveBootStrapData(String sysName, long sysAddr, double x, double y, double z) {
-        Database.withDao(SystemDao.class, dao -> {
-            dao.upsert(toBootstrapEntity(sysName, sysAddr, x, y, z));
-            return Void.TYPE;
-        });
-    }
-
-    private SystemDao.StarSystem toBootstrapEntity(String sysName, long sysAddr,
-                                                   double x, double y, double z) {
-        SystemDao.StarSystem entity = new SystemDao.StarSystem();
-        // Note: no setDate() — the date field was removed from StarSystem.
-        // discovered_at is set by the DB DEFAULT CURRENT_TIMESTAMP on INSERT.
-        entity.setSystemAddress(sysAddr);
-        entity.setStarName(sysName);
-        entity.setX(x);
-        entity.setY(y);
-        entity.setZ(z);
-        entity.setSector(computeSector(x, y, z));
-        return entity;
-    }
-
     /**
      * Computes a 1000 ly grid sector key from galactic coordinates.
-     * Used as a coarse locality bucket for display / filtering — not for
+     * Used as a coarse locality bucket for display / filtering - not for
      * any hot query path (idx_ss_xyz handles spatial lookups directly).
      */
     private static String computeSector(double x, double y, double z) {
@@ -93,15 +71,6 @@ public class StarSystemManager {
                         goalX, goalY, goalZ,
                         minDistSq, currName
                 )
-        );
-    }
-
-    public List<SystemDao.StarSystem> findSystemsInCorridor(double minX, double maxX,
-                                                            double minY, double maxY,
-                                                            double minZ, double maxZ) {
-        return Database.withDao(
-                SystemDao.class,
-                dao -> dao.findSystemsInCorridor(minX, maxX, minY, maxY, minZ, maxZ)
         );
     }
 
@@ -165,22 +134,4 @@ public class StarSystemManager {
         return entity;
     }
 
-    // getAdjacentSectors kept for any future use — not called internally.
-    @SuppressWarnings("unused")
-    private List<String> getAdjacentSectors(String currentSector) {
-        String[] parts = currentSector.split("_");
-        int sx = Integer.parseInt(parts[0]);
-        int sy = Integer.parseInt(parts[1]);
-        int sz = Integer.parseInt(parts[2]);
-
-        List<String> sectors = new ArrayList<>();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    sectors.add(String.format("%d_%d_%d", sx + dx, sy + dy, sz + dz));
-                }
-            }
-        }
-        return sectors;
-    }
 }

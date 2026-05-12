@@ -4,6 +4,7 @@ import com.google.common.eventbus.Subscribe;
 import elite.vault.eddn.dto.EDDN_JournalDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 import elite.vault.json.GsonFactory;
+import elite.vault.util.BubbleFilter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -23,6 +24,10 @@ public class StationSubscriber {
         if (!EVENTS.contains(data.getEvent())) return;
         if (data.getStationName() == null || data.getMarketId() == null) {
             log.debug("Station event dropped - missing required fields (event={})", data.getEvent());
+            return;
+        }
+        if (!BubbleFilter.isInBubble(data.getStarPos())) {
+            log.trace("Station event outside bubble, ignored: {}", data.getStationName());
             return;
         }
         EventProcessingExecutor.submit(() -> update(data));

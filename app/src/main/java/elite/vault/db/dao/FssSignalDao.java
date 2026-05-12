@@ -17,16 +17,16 @@ public interface FssSignalDao {
             INSERT INTO system_signals
                 (systemAddress, starSystem, signalName, signalType, ussType, spawningFaction, spawningState, threatLevel, firstSeen, lastSeen, confirmedCount)
             VALUES
-                (:systemAddress, :starSystem, :signalName, :signalType, :ussType, :spawningFaction, :spawningState, :threatLevel, NOW(), NOW(), 1)
-            ON DUPLICATE KEY UPDATE
-                lastSeen        = NOW(),
+                (:systemAddress, :starSystem, :signalName, :signalType, :ussType, :spawningFaction, :spawningState, :threatLevel, datetime('now'), datetime('now'), 1)
+            ON CONFLICT(systemAddress, signalName) DO UPDATE SET
+                lastSeen        = datetime('now'),
                 confirmedCount  = confirmedCount + 1,
-                starSystem      = VALUES(starSystem),
-                signalType      = COALESCE(VALUES(signalType),      signalType),
-                ussType         = COALESCE(VALUES(ussType),         ussType),
-                spawningFaction = COALESCE(VALUES(spawningFaction), spawningFaction),
-                spawningState   = COALESCE(VALUES(spawningState),   spawningState),
-                threatLevel     = COALESCE(VALUES(threatLevel),     threatLevel)
+                starSystem      = excluded.starSystem,
+                signalType      = COALESCE(excluded.signalType,      signalType),
+                ussType         = COALESCE(excluded.ussType,         ussType),
+                spawningFaction = COALESCE(excluded.spawningFaction, spawningFaction),
+                spawningState   = COALESCE(excluded.spawningState,   spawningState),
+                threatLevel     = COALESCE(excluded.threatLevel,     threatLevel)
             """)
     void upsert(@BindBean FssSignalDao.FssSignal data);
 
@@ -60,7 +60,7 @@ public interface FssSignalDao {
         private String spawningFaction;
         private String spawningState;
         private Integer threatLevel;
-        // firstSeen / lastSeen / confirmedCount driven by SQL — read-only from mapper
+        // firstSeen / lastSeen / confirmedCount driven by SQL - read-only from mapper
         private Integer confirmedCount;
         private LocalDateTime firstSeen;
         private LocalDateTime lastSeen;

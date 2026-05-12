@@ -2,7 +2,7 @@ package elite.vault.db.util;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import elite.vault.ConfigManager;
+import elite.vault.util.AppPaths;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jdbi.v3.core.Handle;
@@ -19,31 +19,24 @@ import java.util.Set;
 import java.util.function.Function;
 
 public class Database {
+
     private static final Logger log = LogManager.getLogger(Database.class);
 
+    private static final HikariDataSource DATA_SOURCE;
     private static final Jdbi JDBI;
-    private static final HikariDataSource dataSource;
-    private static final ConfigManager conf = ConfigManager.getInstance();
 
     private static void migrateIfNeeded() {
         JDBI.useHandle(handle -> {
             try {
                 DatabaseMigrator.migrate(handle);
             } catch (Exception e) {
-                throw new RuntimeException("Migration failed - your DB might be b0rked", e);
+                throw new RuntimeException("Migration failed - DB may be corrupt", e);
             }
         });
-        try (Handle h = JDBI.open()) {
-            h.execute("CALL maintain_commodity_partitions(72, 6)");
-            log.info("Commodity partitions initialized");
-        } catch (Exception e) {
-            log.warn("Partition maintenance failed at startup - commodity inserts may deadlock", e);
-        }
     }
 
-
     /**
-     * Standard single-DAO operation. Opens a handle, runs the block, closes the handle.
+     * Standard single-DAO operation. Opens a handle, runs the block, closes it.
      * Not transactional - do not use when you need DELETE + INSERT atomicity.
      */
     public static <T, R> R withDao(Class<T> daoClass, Function<T, R> block) {
@@ -57,52 +50,27 @@ public class Database {
     /**
      * Transactional handle operation. Opens a single connection, begins a transaction,
      * runs the block, commits on success, rolls back on any exception.
-     * <p>
+     *
      * Use this when you need multiple DAO operations to be atomic - e.g. the
      * commodity snapshot replace (DELETE existing rows + bulk INSERT new rows).
-     * <p>
-     * Example:
-     * <pre>
-     *   Database.withTransaction(handle -> {
-     *       CommodityDao dao = handle.attach(CommodityDao.class);
-     *       dao.deleteByMarket(marketId);
-     *       dao.insertBatch(batch);
-     *       return null;
-     *   });
-     * </pre>
      */
     public static <R> R withTransaction(Function<Handle, R> block) {
         try {
             return JDBI.inTransaction(handle -> block.apply(handle));
         } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException("Transactional operation failed", e);
         }
     }
 
     /**
      * Raw handle query - opens a handle, runs the block, closes it.
-     * Use this when you need access to Handle-level features that aren't
-     * available through @SqlQuery annotations, such as defineList() for
-     * dynamic IN-clauses (e.g. the planetary station type filter).
-     * <p>
-     * Not transactional. If you need atomicity, use withTransaction instead.
-     * <p>
-     * Example:
-     * <pre>
-     *   List<Foo> results = Database.withHandle(handle ->
-     *       handle.createQuery(MY_SQL)
-     *             .bind("x", x)
-     *             .defineList("myList", myList)
-     *             .mapToBean(Foo.class)
-     *             .list());
-     * </pre>
+     * Use this when you need Handle-level features (e.g. defineList for dynamic IN-clauses).
+     * Not transactional - use withTransaction if you need atomicity.
      */
     public static <R> R withHandle(Function<Handle, R> block) {
         try {
             return JDBI.withHandle(handle -> block.apply(handle));
         } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException("Handle operation failed", e);
         }
     }
@@ -112,6 +80,12 @@ public class Database {
      */
     public static Handle init() {
         return JDBI.open();
+    }
+
+    public static void shutdown() {
+        if (DATA_SOURCE != null && !DATA_SOURCE.isClosed()) {
+            DATA_SOURCE.close();
+        }
     }
 
     private static Set<Class<?>> findDaoClasses(String packageName) throws Exception {
@@ -131,9 +105,9 @@ public class Database {
                             .forEach(p -> {
                                 try {
                                     String className = packageName + "." +
-                                                       root.relativize(p).toString()
-                                                               .replace(FileSystems.getDefault().getSeparator(), ".")
-                                                               .replace(".class", "");
+                                            root.relativize(p).toString()
+                                                    .replace(FileSystems.getDefault().getSeparator(), ".")
+                                                    .replace(".class", "");
                                     Class<?> clazz = Class.forName(className);
                                     if (clazz.isInterface() && clazz.getSimpleName().endsWith("Dao")) {
                                         classes.add(clazz);
@@ -156,9 +130,9 @@ public class Database {
                                 .forEach(p -> {
                                     try {
                                         String className = packageName + "." +
-                                                           root.relativize(p).toString()
-                                                                   .replace("/", ".")
-                                                                   .replace(".class", "");
+                                                root.relativize(p).toString()
+                                                        .replace("/", ".")
+                                                        .replace(".class", "");
                                         Class<?> clazz = Class.forName(className);
                                         if (clazz.isInterface() && clazz.getSimpleName().endsWith("Dao")) {
                                             classes.add(clazz);
@@ -175,76 +149,57 @@ public class Database {
     }
 
     static {
-        String host = conf.getSystemKey(ConfigManager.DB_SERVER);
-        String port = conf.getSystemKey(ConfigManager.DB_PORT);
-        String dbName = conf.getSystemKey(ConfigManager.DB_NAME);
-        String user = conf.getSystemKey(ConfigManager.DB_USER);
-        String pass = conf.getSystemKey(ConfigManager.DB_PASS);
+        try {
+            Path dbPath = AppPaths.getDatabasePath();
+            log.info("SQLite database: {}", dbPath);
 
-        String jdbcUrl = String.format(
-                "jdbc:mysql://%s:%s/%s" +
-                "?useUnicode=true" +
-                "&characterEncoding=UTF-8" +
-                "&connectionAttributes=program_name:EliteVault" +
-                "&useServerPrepStmts=true" +
-                "&cachePrepStmts=true" +
-                "&prepStmtCacheSize=150" +
-                "&prepStmtCacheSqlLimit=2048" +
-                "&rewriteBatchedStatements=true" +   // multi-row INSERT rewrite - critical for batch perf
-                "&socketTimeout=30000" +
-                "&connectTimeout=10000" +
-                "&useLocalSessionState=true" +
-                "&useLocalTransactionState=true" +
-                "&cacheResultSetMetadata=true" +
-                "&maintainTimeStats=false",
-                host, port, dbName
-        );
+            String url = "jdbc:sqlite:" + dbPath
+                    + "?journal_mode=WAL"
+                    + "&busy_timeout=5000"
+                    + "&synchronous=NORMAL"
+                    + "&foreign_keys=ON";
 
-        // Configure HikariCP connection pool
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(jdbcUrl);
-        config.setUsername(user);
-        config.setPassword(pass);
+            HikariConfig hikari = new HikariConfig();
+            hikari.setJdbcUrl(url);
+            hikari.setMaximumPoolSize(4);
+            hikari.setMinimumIdle(1);
+            hikari.setConnectionTimeout(10_000);
+            hikari.setIdleTimeout(300_000);
+            hikari.setMaxLifetime(600_000);
+            hikari.setPoolName("EliteVaultPool");
+            hikari.setConnectionTestQuery("SELECT 1");
 
-        // Pool sizing for high-throughput EDDN ingest
-        config.setMaximumPoolSize(20);              // Max connections
-        config.setMinimumIdle(5);                   // Keep 5 warm connections
-        config.setConnectionTimeout(10000);         // 10s to get connection from pool
-        config.setIdleTimeout(300000);              // 5min idle before closing
-        config.setMaxLifetime(600000);              // 10min max connection lifetime
-        config.setKeepaliveTime(120000);            // 2min keepalive ping
+            DATA_SOURCE = new HikariDataSource(hikari);
+            JDBI = Jdbi.create(DATA_SOURCE).installPlugin(new SqlObjectPlugin());
 
-        // Performance tuning
-        config.setPoolName("EliteVaultPool");
-        config.setAutoCommit(true);
-        config.setLeakDetectionThreshold(60000);    // Warn if connection held > 60s
+            JDBI.withHandle(h -> {
+                String version = h.createQuery("SELECT sqlite_version()").mapTo(String.class).one();
+                log.info("Connected to SQLite {} - pool max={}", version, hikari.getMaximumPoolSize());
 
-        dataSource = new HikariDataSource(config);
+                h.execute("PRAGMA journal_mode = WAL;");
+                h.execute("PRAGMA synchronous = NORMAL;");
+                h.execute("PRAGMA busy_timeout = 5000;");
+                h.execute("PRAGMA foreign_keys = ON;");
+                h.execute("PRAGMA cache_size = -64000;");
+                h.execute("PRAGMA temp_store = MEMORY;");
+                h.execute("PRAGMA mmap_size = 268435456;");
 
-        JDBI = Jdbi.create(dataSource)
-                .installPlugin(new SqlObjectPlugin());
-
-        try (var h = JDBI.open()) {
-            String version = h.createQuery("SELECT VERSION()").mapTo(String.class).one();
-            log.info("Connected to MySQL version: {} with HikariCP pool (max={}, min={})", version, config.getMaximumPoolSize(), config.getMinimumIdle());
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "MySQL connection failed. Check host/port/credentials/database existence.\n" +
-                    "URL was: " + jdbcUrl.replaceAll("(?<=password=)[^&]+", "****"), e);
-        }
-
-        JDBI.withHandle(h -> {
-            try {
-                Set<Class<?>> daoClasses = findDaoClasses("elite.vault.db.dao");
-                for (Class<?> daoClass : daoClasses) {
-                    h.attach(daoClass);
+                try {
+                    Set<Class<?>> daoClasses = findDaoClasses("elite.vault.db.dao");
+                    for (Class<?> daoClass : daoClasses) {
+                        h.attach(daoClass);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to warm DAO classes", e);
                 }
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to attach DAO classes", e);
-            }
-            return null;
-        });
 
-        migrateIfNeeded();
+                return null;
+            });
+
+            migrateIfNeeded();
+
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 }

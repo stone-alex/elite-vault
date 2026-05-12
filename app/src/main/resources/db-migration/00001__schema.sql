@@ -1,354 +1,211 @@
 -- ============================================================================
--- Elite Vault - Database Schema
--- MySQL 8.0+
+-- Elite Vault — SQLite schema (bubble only, ~16K systems, ~24K stations)
 --
--- Clean rewrite from MariaDB 10.3 schema.
--- Key changes from previous version:
---   - POINT / SPATIAL INDEX removed from star_system (MySQL spatial is 2D
---     geographic only; Elite uses Cartesian 3D — plain BETWEEN is correct)
---   - Descending indexes now native (MariaDB 10.3 stored them ASC silently)
---   - JSON type for structured multi-value station fields
---   - CHECK constraints are enforced (MariaDB 10.3 parsed but ignored them)
---   - stations.x/y/z denormalized at write time — no join in hot queries
---   - Fleet carrier table added for position tracking via EDDN CarrierJump
+-- Design notes:
+--   - No partitioning — commodity TTL enforced by scheduled DELETE (3h window)
 --   - No FK constraints — EDDN delivers events in arbitrary order
+--   - BOOLEAN stored as INTEGER (0/1) — SQLite has no native boolean type
+--   - JSON stored as TEXT — SQLite 3.38+ json_each() used for queries
+--   - Timestamps: received_at / last_updated use unixepoch() (INTEGER)
+--                 firstSeen / lastSeen / discovered_at use datetime() (TEXT)
+--   - All indexes defined separately (SQLite CREATE TABLE only supports UNIQUE)
 -- ============================================================================
 
-SET NAMES utf8mb4;
-SET CHARACTER SET utf8mb4;
-SET COLLATION_CONNECTION = 'utf8mb4_0900_ai_ci';
-
-
 -- ============================================================================
--- Commodity type lookup  (~300 rows, fully cached in application)
+-- Commodity type lookup (~300 rows, fully cached in application at startup)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS commodity_type (
-    id   SMALLINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    UNIQUE KEY uk_ct_name(name)
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
+                                              id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                                              name TEXT NOT NULL,
+                                              UNIQUE (name)
+);
 
 -- ============================================================================
--- Star systems
---
--- 763k rows. No POINT column — the 2D spatial index was an approximation
--- that ignored galactic Y elevation. Composite idx_ss_xyz covers all
--- bounding-box queries with a single index scan.
---
--- x/y/z: Elite Dangerous Cartesian coords in light years.
---   Origin (0,0,0) = Sol.
---   Y axis = galactic elevation (most populated space is within ±500 ly).
---   X/Z span ~65,000 ly across the galaxy.
+-- Star systems (bubble only — ingest filter rejects anything >500 ly from Sol)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS star_system (
-    systemAddress BIGINT       NOT NULL,
-    starName      VARCHAR(100) NOT NULL,
-    sector        VARCHAR(100) NOT NULL,
-    x             DOUBLE       NOT NULL,
-    y             DOUBLE       NOT NULL,
-    z             DOUBLE       NOT NULL,
-    discovered_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                           systemAddress INTEGER NOT NULL PRIMARY KEY,
+                                           starName      TEXT    NOT NULL,
+                                           sector        TEXT    NOT NULL DEFAULT '',
+                                           x             REAL    NOT NULL,
+                                           y             REAL    NOT NULL,
+                                           z             REAL    NOT NULL,
+                                           discovered_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 
-    PRIMARY KEY (systemAddress),
-    INDEX idx_ss_name(starName),
-    INDEX idx_ss_sector(sector),
-
-    -- Composite covering index for 3D bounding-box lookups.
-    -- Used by findNeighbors, findSystemsInCorridor, and all hop queries
-    -- that bounding-box star_system before the commodity join.
-    INDEX idx_ss_xyz(x, y, z)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
+CREATE INDEX IF NOT EXISTS idx_ss_name ON star_system (starName);
+CREATE INDEX IF NOT EXISTS idx_ss_xyz ON star_system (x, y, z);
 
 -- ============================================================================
 -- Stations
 --
--- marketId == stationId from EDDN (same value, named marketId to avoid
--- confusion with the commodity market).
+-- x/y/z denormalized from star_system at upsert time — eliminates the join
+-- in every hop query. Stations whose system is not yet in star_system are
+-- dropped by StationManager and never reach this table.
 --
--- x/y/z are denormalized from star_system at upsert time. This eliminates
--- the star_system join in every hop query. Stations whose systemAddress is
--- not yet in star_system get x=y=z=0 and are corrected on the next EDDN
--- event for that system.
---
--- economies / services stored as JSON — MySQL 8 validates structure and
--- allows JSON_CONTAINS / JSON_OVERLAPS queries with functional indexes.
+-- economies / services stored as TEXT (JSON arrays).
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS stations (
-    id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress           BIGINT       NOT NULL,
-    marketId                BIGINT       NOT NULL,
-    realName                VARCHAR(120) NOT NULL,
-    controllingFaction      VARCHAR(100)          DEFAULT NULL,
-    controllingFactionState VARCHAR(60)           DEFAULT NULL,
-    distanceToArrival       DOUBLE       NOT NULL DEFAULT 0,
-    primaryEconomy          VARCHAR(60)           DEFAULT NULL,
-    economies               JSON                  DEFAULT NULL,
-    government              VARCHAR(60)           DEFAULT NULL,
-    services                JSON                  DEFAULT NULL,
-    stationType             VARCHAR(80)           DEFAULT NULL,
-    hasLargePad             BOOLEAN      NOT NULL DEFAULT FALSE,
-    hasMediumPad            BOOLEAN      NOT NULL DEFAULT FALSE,
-    hasSmallPad             BOOLEAN      NOT NULL DEFAULT FALSE,
+                                        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        systemAddress           INTEGER NOT NULL,
+                                        marketId                INTEGER NOT NULL,
+                                        realName                TEXT    NOT NULL,
+                                        controllingFaction      TEXT,
+                                        controllingFactionState TEXT,
+                                        distanceToArrival       REAL    NOT NULL DEFAULT 0,
+                                        primaryEconomy          TEXT,
+                                        economies               TEXT,
+                                        government              TEXT,
+                                        services                TEXT,
+                                        stationType             TEXT,
+                                        hasLargePad             INTEGER NOT NULL DEFAULT 0,
+                                        hasMediumPad            INTEGER NOT NULL DEFAULT 0,
+                                        hasSmallPad             INTEGER NOT NULL DEFAULT 0,
+                                        x                       REAL    NOT NULL DEFAULT 0,
+                                        y                       REAL    NOT NULL DEFAULT 0,
+                                        z                       REAL    NOT NULL DEFAULT 0,
+                                        received_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+                                        UNIQUE (marketId),
+                                        UNIQUE (systemAddress, marketId)
+);
 
-    -- Denormalized from star_system — eliminates join in all hot queries.
-    x                       DOUBLE       NOT NULL DEFAULT 0,
-    y                       DOUBLE       NOT NULL DEFAULT 0,
-    z                       DOUBLE       NOT NULL DEFAULT 0,
-
-    received_at             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT chk_distanceToArrival CHECK (distanceToArrival >= 0),
-
-    UNIQUE KEY uk_stations_market(marketId),
-    UNIQUE KEY uk_stations_sys_mkt(systemAddress, marketId),
-    INDEX idx_stations_system(systemAddress),
-    INDEX idx_stations_name(realName(40)),
-
-    -- Covers hop-query filters: pad size, station type, arrival distance.
-    INDEX idx_st_route(marketId, stationType, hasLargePad, hasMediumPad, distanceToArrival),
-
-    -- Covers 3D bounding-box for route queries (avoids touching star_system).
-    INDEX idx_st_xyz(x, y, z)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
+CREATE INDEX IF NOT EXISTS idx_stations_system ON stations (systemAddress);
+CREATE INDEX IF NOT EXISTS idx_stations_name ON stations (realName);
+CREATE INDEX IF NOT EXISTS idx_st_route ON stations (marketId, stationType, hasLargePad, hasMediumPad, distanceToArrival);
+CREATE INDEX IF NOT EXISTS idx_st_xyz ON stations (x, y, z);
 
 -- ============================================================================
--- Commodity  (hot table — partitioned, rolling 6-hour window)
+-- Commodity  (no partitioning — rolling 3-hour window via scheduled DELETE)
 --
--- Ingest pattern per station snapshot:
---   DELETE FROM commodity WHERE marketId = ?
---   Bulk INSERT new rows
---
--- received_at stored as INT UNSIGNED epoch seconds.
--- Partition key must be in the PRIMARY KEY.
---
--- Descending index on sellPrice is now physically stored DESC in MySQL 8
--- (MariaDB 10.3 silently stored it ASC). This makes findBestSell range
--- scans read rows in the correct order without filesort.
+-- PRIMARY KEY is (marketId, commodityId) — one row per commodity per market.
+-- Ingest pattern: DELETE WHERE marketId = ? → batch INSERT new snapshot.
+-- TTL: DELETE WHERE received_at < unixepoch() - 10800  (runs every 15 min)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS commodity (
-    marketId      BIGINT            NOT NULL,
-    commodityId   SMALLINT UNSIGNED NOT NULL,
-    systemAddress BIGINT            NOT NULL,
-    buyPrice      INT UNSIGNED      NOT NULL DEFAULT 0,
-    sellPrice     INT UNSIGNED      NOT NULL DEFAULT 0,
-    stock         INT UNSIGNED      NOT NULL DEFAULT 0,
-    demand        INT UNSIGNED      NOT NULL DEFAULT 0,
-    received_at   INT UNSIGNED      NOT NULL,
+                                         marketId      INTEGER NOT NULL,
+                                         commodityId   INTEGER NOT NULL,
+                                         systemAddress INTEGER NOT NULL,
+                                         buyPrice      INTEGER NOT NULL DEFAULT 0,
+                                         sellPrice     INTEGER NOT NULL DEFAULT 0,
+                                         stock         INTEGER NOT NULL DEFAULT 0,
+                                         demand        INTEGER NOT NULL DEFAULT 0,
+                                         received_at   INTEGER NOT NULL,
 
-    CONSTRAINT chk_buyPrice CHECK (buyPrice >= 0),
-    CONSTRAINT chk_sellPrice CHECK (sellPrice >= 0),
-    CONSTRAINT chk_stock CHECK (stock >= 0),
-    CONSTRAINT chk_demand CHECK (demand >= 0),
+                                         PRIMARY KEY (marketId, commodityId)
+);
 
-    PRIMARY KEY (marketId, commodityId, received_at),
-
-    -- findBuyCandidates: commodity WHERE commodityId=? AND buyPrice>0 AND stock>0
-    -- Includes systemAddress so the bounding-box filter can use this index
-    -- alone without touching stations for the position lookup.
-    INDEX idx_c_buy_route(commodityId, buyPrice ASC, stock DESC, systemAddress),
-
-    -- findBestSell: commodity WHERE commodityId=? AND sellPrice>0 AND demand>0
-    -- DESC on sellPrice is now physically correct in MySQL 8.
-    INDEX idx_c_sell_route(commodityId, sellPrice DESC, demand DESC, systemAddress),
-
-    INDEX idx_c_market(marketId)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
-    PARTITION BY RANGE (received_at DIV 3600) (
-        PARTITION p_future VALUES LESS THAN MAXVALUE
-        );
-
+CREATE INDEX IF NOT EXISTS idx_c_buy_route ON commodity (commodityId, buyPrice, stock, systemAddress);
+CREATE INDEX IF NOT EXISTS idx_c_sell_route ON commodity (commodityId, sellPrice, demand, systemAddress);
+CREATE INDEX IF NOT EXISTS idx_c_market ON commodity (marketId);
+CREATE INDEX IF NOT EXISTS idx_c_ttl ON commodity (received_at);
 
 -- ============================================================================
 -- Market snapshot deduplication
---
--- EDDN delivers market snapshots whenever a commander docks. If 4 commanders
--- dock at the same station within seconds, the ingest layer receives 4
--- identical snapshots for the same marketId — each triggering a full
--- DELETE + bulk INSERT against the partitioned commodity table.
---
--- This table is a change-detection gate. Before replacing commodity rows,
--- the ingest layer computes a lightweight hash of the incoming snapshot
--- (XOR of commodityId+buyPrice+sellPrice across all rows) and compares it
--- to last_hash. If unchanged, the snapshot is discarded without touching
--- the commodity partition at all.
---
--- last_hash:    Java-computed snapshot hash (not cryptographic, change-detect only)
--- last_updated: epoch seconds of the last accepted (changed) snapshot
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS market_last_seen (
-    marketId     BIGINT       NOT NULL,
-    last_hash    BIGINT       NOT NULL,
-    last_updated INT UNSIGNED NOT NULL,
-
-    PRIMARY KEY (marketId)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
-
--- ============================================================================
--- Stellar bodies
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS stellar_object (
-    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress         BIGINT   NOT NULL,
-    bodyId                BIGINT   NOT NULL DEFAULT 0,
-    bodyName              VARCHAR(120)      DEFAULT NULL,
-    received_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    atmosphereType        VARCHAR(60)       DEFAULT NULL,
-    planetClass           VARCHAR(60)       DEFAULT NULL,
-    terraformState        VARCHAR(60)       DEFAULT NULL,
-    volcanism             VARCHAR(100)      DEFAULT NULL,
-
-    distanceFromArrivalLs DOUBLE            DEFAULT NULL,
-    radius                DOUBLE            DEFAULT NULL,
-    massEm                DOUBLE            DEFAULT NULL,
-    surfaceGravity        DOUBLE            DEFAULT NULL,
-    surfaceTemperature    DOUBLE            DEFAULT NULL,
-    surfacePressure       DOUBLE            DEFAULT NULL,
-
-    orbitalPeriod         DOUBLE            DEFAULT NULL,
-    semiMajorAxis         DOUBLE            DEFAULT NULL,
-    eccentricity          DOUBLE            DEFAULT NULL,
-    orbitalInclination    DOUBLE            DEFAULT NULL,
-    periapsis             DOUBLE            DEFAULT NULL,
-    meanAnomaly           DOUBLE            DEFAULT NULL,
-
-    rotationPeriod        DOUBLE            DEFAULT NULL,
-    tidalLock             BOOLEAN           DEFAULT NULL,
-    landable              BOOLEAN           DEFAULT NULL,
-
-    UNIQUE KEY uk_so_system_body(systemAddress, bodyId),
-    INDEX idx_so_system(systemAddress),
-    INDEX idx_so_body_name(bodyName(40))
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
-
-CREATE TABLE IF NOT EXISTS parents (
-    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress BIGINT NOT NULL,
-    bodyId        BIGINT NOT NULL,
-    parentBodyId  BIGINT NOT NULL,
-    parentType    VARCHAR(12) DEFAULT NULL,
-
-    UNIQUE KEY uk_parents_system_body(systemAddress, bodyId),
-    INDEX idx_parents_parent(parentBodyId)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
-
--- ============================================================================
--- Materials
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS materials (
-    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress BIGINT      NOT NULL,
-    bodyId        BIGINT      NOT NULL,
-    materialName  VARCHAR(80) NOT NULL,
-    percent       DOUBLE      NOT NULL,
-
-    UNIQUE KEY uk_materials_body_material(systemAddress, bodyId, materialName(40)),
-    INDEX idx_materials_system(systemAddress),
-    INDEX idx_materials_name(materialName(40))
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
-
--- ============================================================================
--- Rings
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS rings (
-    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress BIGINT      NOT NULL,
-    bodyId        BIGINT      NOT NULL,
-    ringType      VARCHAR(60) NOT NULL,
-    mass          DOUBLE      NOT NULL,
-    innerRadius   DOUBLE      NOT NULL,
-    outerRadius   DOUBLE      NOT NULL,
-    signals       VARCHAR(255) DEFAULT NULL,
-
-    UNIQUE KEY uk_rings_system_body(systemAddress, bodyId),
-    INDEX idx_rings_system(systemAddress)
-
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
-
+                                                marketId     INTEGER NOT NULL PRIMARY KEY,
+                                                last_hash    INTEGER NOT NULL,
+                                                last_updated INTEGER NOT NULL
+);
 
 -- ============================================================================
 -- Factions
 -- ============================================================================
 
-DROP TABLE IF EXISTS factions;
-
-CREATE TABLE IF NOT EXISTS factions (
-    id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    systemAddress BIGINT       NOT NULL,
-    factionName   VARCHAR(100) NOT NULL,
-    allegiance    VARCHAR(40),
-    government    VARCHAR(60),
-    influence     DECIMAL(5, 4),
-    factionState  VARCHAR(40),
-    happiness     VARCHAR(40),
-    isPirate      TINYINT(1)   NOT NULL DEFAULT 0,
-    received_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_factions_system(systemAddress),
-    INDEX idx_factions_name(factionName),
-    INDEX idx_factions_pirate(isPirate)
+CREATE TABLE IF NOT EXISTS factions
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    systemAddress INTEGER NOT NULL,
+    factionName   TEXT    NOT NULL,
+    allegiance    TEXT,
+    government    TEXT,
+    influence     REAL,
+    factionState  TEXT,
+    happiness     TEXT,
+    isPirate      INTEGER NOT NULL DEFAULT 0,
+    received_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (systemAddress, factionName)
 );
 
+CREATE INDEX IF NOT EXISTS idx_factions_system ON factions (systemAddress);
+CREATE INDEX IF NOT EXISTS idx_factions_name ON factions (factionName);
+CREATE INDEX IF NOT EXISTS idx_factions_pirate ON factions (isPirate);
 
 -- ============================================================================
 -- Powerplay state
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS powerplay_state (
-    systemAddress       BIGINT PRIMARY KEY,
-    systemAllegiance    VARCHAR(40)       DEFAULT NULL,
-    systemEconomy       VARCHAR(60)       DEFAULT NULL,
-    systemSecondEconomy VARCHAR(60)       DEFAULT NULL,
-    systemGovernment    VARCHAR(60)       DEFAULT NULL,
-    systemSecurity      VARCHAR(60)       DEFAULT NULL,
-    controllingFaction  VARCHAR(100)      DEFAULT NULL,
-    powers              JSON              DEFAULT NULL,
-    powerplayState      VARCHAR(60)       DEFAULT NULL,
-    controllingPower    VARCHAR(60)       DEFAULT NULL,
-    controlProgress     DOUBLE            DEFAULT NULL,
-    reinforcement       INT               DEFAULT NULL,
-    undermining         INT               DEFAULT NULL,
-    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS powerplay_state
+(
+    systemAddress       INTEGER PRIMARY KEY,
+    systemAllegiance    TEXT,
+    systemEconomy       TEXT,
+    systemSecondEconomy TEXT,
+    systemGovernment    TEXT,
+    systemSecurity      TEXT,
+    controllingFaction  TEXT,
+    powers              TEXT,
+    powerplayState      TEXT,
+    controllingPower    TEXT,
+    controlProgress     REAL,
+    reinforcement       INTEGER,
+    undermining         INTEGER,
+    updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
-) ENGINE = InnoDB
-    DEFAULT CHARSET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci;
+-- ============================================================================
+-- FSS signals — RES sites and USS for pirate hunting
+-- (stellar_object, parents, materials, rings were removed in Phase 3 — not needed for bubble service)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS system_signals
+(
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    systemAddress   INTEGER NOT NULL,
+    starSystem      TEXT    NOT NULL,
+    signalName      TEXT    NOT NULL,
+    signalType      TEXT,
+    ussType         TEXT,
+    spawningFaction TEXT,
+    spawningState   TEXT,
+    threatLevel     INTEGER,
+    firstSeen       TEXT    NOT NULL DEFAULT (datetime('now')),
+    lastSeen        TEXT    NOT NULL DEFAULT (datetime('now')),
+    confirmedCount  INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (systemAddress, signalName)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sig_system ON system_signals (systemAddress);
+CREATE INDEX IF NOT EXISTS idx_sig_usstype ON system_signals (ussType);
+
+-- ============================================================================
+-- Pirate faction keywords
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS pirate_faction_keywords
+(
+    keyword TEXT PRIMARY KEY
+);
+
+INSERT OR IGNORE INTO pirate_faction_keywords (keyword)
+VALUES
+    ('Cartel'), ('Mafia'), ('Syndicate'), ('Camorra'), ('Raiders'), ('Gang'), ('Mob'), ('Clan'), ('Pirates'), ('Brotherhood'), ('Crimson'), ('Purple'), ('Blue'), ('Gold'), ('Silver'), ('Jet'), ('Black'), ('Rats'), ('Posse'), ('Ring'), ('Crew');
+
+-- ============================================================================
+-- RES signal grade lookup
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS res_signal_grades
+(
+    signalName TEXT PRIMARY KEY,
+    grade      TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO res_signal_grades (signalName, grade)
+VALUES
+    ('$MULTIPLAYER_SCENARIO14_TITLE;', 'Low'), ('$MULTIPLAYER_SCENARIO77_TITLE;', 'Normal'), ('$MULTIPLAYER_SCENARIO78_TITLE;', 'High'), ('$MULTIPLAYER_SCENARIO81_TITLE;', 'Hazardous');

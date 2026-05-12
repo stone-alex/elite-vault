@@ -27,19 +27,20 @@ public interface PowerPlayStateDao {
                 :powerplayState, :controllingPower, :controlProgress,
                 :reinforcement, :undermining
             )
-            ON DUPLICATE KEY UPDATE
-                systemAllegiance    = VALUES(systemAllegiance),
-                systemEconomy       = VALUES(systemEconomy),
-                systemSecondEconomy = VALUES(systemSecondEconomy),
-                systemGovernment    = VALUES(systemGovernment),
-                systemSecurity      = VALUES(systemSecurity),
-                controllingFaction  = VALUES(controllingFaction),
-                powers              = VALUES(powers),
-                powerplayState      = VALUES(powerplayState),
-                controllingPower    = VALUES(controllingPower),
-                controlProgress     = VALUES(controlProgress),
-                reinforcement       = VALUES(reinforcement),
-                undermining         = VALUES(undermining)
+            ON CONFLICT(systemAddress) DO UPDATE SET
+                systemAllegiance    = excluded.systemAllegiance,
+                systemEconomy       = excluded.systemEconomy,
+                systemSecondEconomy = excluded.systemSecondEconomy,
+                systemGovernment    = excluded.systemGovernment,
+                systemSecurity      = excluded.systemSecurity,
+                controllingFaction  = excluded.controllingFaction,
+                powers              = excluded.powers,
+                powerplayState      = excluded.powerplayState,
+                controllingPower    = excluded.controllingPower,
+                controlProgress     = excluded.controlProgress,
+                reinforcement       = excluded.reinforcement,
+                undermining         = excluded.undermining,
+                updated_at          = datetime('now')
             """)
     void upsert(@BindBean PowerPlayState data);
 

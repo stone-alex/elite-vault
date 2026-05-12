@@ -2,7 +2,7 @@ package elite.vault.db.projections;
 
 /**
  * Projection returned by CommodityDao.findBuyCandidates.
- * Coordinates come from stations.x/y/z — no star_system join needed.
+ * Coordinates come from stations.x/y/z - no star_system join needed.
  * buySystem is omitted; if needed for display, look up via systemAddress.
  */
 public class BuyCandidateProjection {

@@ -12,12 +12,12 @@ package elite.vault.db.projections;
  * <p>
  * runValue      = profitPerUnit * LEAST(buyStock, sellDemand, cargoCap)
  * Proxy for total profit from one full cargo run.
- * Used for ORDER BY in the query — favours high-volume
+ * Used for ORDER BY in the query - favours high-volume
  * low-margin pairs over high-margin low-stock pairs when
  * they yield more total credit.
  * <p>
  * distanceBuyToSell = straight-line ly between buy and sell station.
- * Informational only — does not affect route selection.
+ * Informational only - does not affect route selection.
  * <p>
  * distanceFromRef   = straight-line ly from the caller's current position
  * to the buy station.

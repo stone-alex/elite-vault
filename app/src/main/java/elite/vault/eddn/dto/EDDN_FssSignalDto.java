@@ -8,8 +8,8 @@ import com.google.gson.annotations.SerializedName;
  * Schema: https://eddn.edcd.io/schemas/fsssignaldiscovered/1
  * <p>
  * Notes:
- * - Localised strings (_Localised suffix) are stripped by the EDDN gateway — never present.
- * - TimeRemaining is disallowed by the schema — never present.
+ * - Localised strings (_Localised suffix) are stripped by the EDDN gateway - never present.
+ * - TimeRemaining is disallowed by the schema - never present.
  * - USSType is only present for USS signals, never for ResourceExtraction signals.
  * - SpawningFaction / SpawningState / ThreatLevel are only present for USS signals.
  */
@@ -19,34 +19,34 @@ public class EDDN_FssSignalDto {
     private String timestamp;               // ISO date-time, required
 
     @SerializedName("SignalName")
-    private String signalName;              // required — localisation key e.g. "$MULTIPLAYER_SCENARIO78_TITLE;"
+    private String signalName;              // required - localisation key e.g. "$MULTIPLAYER_SCENARIO78_TITLE;"
     // or plain name for fleet carriers / installations
 
     @SerializedName("SignalType")
-    private String signalType;              // optional — "ResourceExtraction", "FleetCarrier",
+    private String signalType;              // optional - "ResourceExtraction", "FleetCarrier",
     // "Installation", "NavBeacon", "USS", etc.
 
     @SerializedName("IsStation")
-    private Boolean isStation;             // optional — true for station-like signals
+    private Boolean isStation;             // optional - true for station-like signals
 
     @SerializedName("USSType")
-    private String ussType;                 // optional — USS signals only, e.g. "$USS_Type_Salvage;"
+    private String ussType;                 // optional - USS signals only, e.g. "$USS_Type_Salvage;"
     // "$USS_Type_MissionTarget;" is blocked by schema
 
     @SerializedName("SpawningFaction")
-    private String spawningFaction;         // optional — USS signals only
+    private String spawningFaction;         // optional - USS signals only
 
     @SerializedName("SpawningState")
-    private String spawningState;           // optional — USS signals only
+    private String spawningState;           // optional - USS signals only
 
     @SerializedName("SpawningPower")
-    private String spawningPower;           // optional — powerplay context
+    private String spawningPower;           // optional - powerplay context
 
     @SerializedName("OpposingPower")
-    private String opposingPower;           // optional — powerplay context
+    private String opposingPower;           // optional - powerplay context
 
     @SerializedName("ThreatLevel")
-    private Integer threatLevel;            // optional — USS threat level integer
+    private Integer threatLevel;            // optional - USS threat level integer
 
     // -------------------------------------------------------------------------
     // Helpers

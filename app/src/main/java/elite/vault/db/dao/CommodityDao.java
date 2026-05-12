@@ -40,7 +40,7 @@ public interface CommodityDao {
     @RegisterBeanMapper(CommodityTypeRow.class)
     List<CommodityTypeRow> loadAllCommodityTypes();
 
-    @SqlUpdate("INSERT IGNORE INTO commodity_type (name) VALUES (:name)")
+    @SqlUpdate("INSERT OR IGNORE INTO commodity_type (name) VALUES (:name)")
     void insertCommodityTypeIfAbsent(@Bind("name") String name);
 
     @SqlQuery("SELECT id FROM commodity_type WHERE name = :name")
@@ -55,12 +55,12 @@ public interface CommodityDao {
     // Returns 0 if the hash matches the stored value (skip replace entirely).
     //
     // Uses INSERT ... ON DUPLICATE KEY UPDATE so the check and update are
-    // atomic — no race between the SELECT and the UPDATE under concurrent
+    // atomic - no race between the SELECT and the UPDATE under concurrent
     // ingest from multiple commanders at the same station.
     //
     // The hash is computed in Java (CommodityHasher) as a lightweight XOR
     // across all (commodityId, buyPrice, sellPrice) tuples in the snapshot.
-    // Not cryptographic — change detection only.
+    // Not cryptographic - change detection only.
     // -------------------------------------------------------------------------
 
     @SqlQuery("""
@@ -71,12 +71,21 @@ public interface CommodityDao {
 
     @SqlUpdate("""
             INSERT INTO market_last_seen (marketId, last_hash, last_updated)
-            VALUES (:marketId, :hash, UNIX_TIMESTAMP())
-            ON DUPLICATE KEY UPDATE
-                last_hash    = VALUES(last_hash),
-                last_updated = VALUES(last_updated)
+            VALUES (:marketId, :hash, unixepoch())
+            ON CONFLICT(marketId) DO UPDATE SET
+                last_hash    = excluded.last_hash,
+                last_updated = excluded.last_updated
             """)
     void upsertHash(@Bind("marketId") long marketId, @Bind("hash") long hash);
+
+
+    // -------------------------------------------------------------------------
+    // TTL maintenance - delete commodity rows older than 3 hours
+    // Called by MarketPruneScheduler every 15 minutes.
+    // -------------------------------------------------------------------------
+
+    @SqlUpdate("DELETE FROM commodity WHERE received_at < unixepoch() - 10800")
+    int pruneExpired();
 
 
     // -------------------------------------------------------------------------
@@ -88,31 +97,31 @@ public interface CommodityDao {
 
     @SqlBatch("""
             INSERT INTO commodity (marketId, commodityId, systemAddress, buyPrice, sellPrice, stock, demand, received_at)
-            VALUES (:marketId, :commodityId, :systemAddress, :buyPrice, :sellPrice, :stock, :demand, UNIX_TIMESTAMP())
+            VALUES (:marketId, :commodityId, :systemAddress, :buyPrice, :sellPrice, :stock, :demand, unixepoch())
             """)
     void insertBatch(@BindBean List<CommodityRow> rows);
 
 
     // -------------------------------------------------------------------------
-    // Primary route hop query — single query per hop (MySQL 8 window functions)
+    // Primary route hop query - single query per hop (MySQL 8 window functions)
     //
     // Replaces the old findBuyCandidates + N×findBestSell pattern (up to 21
     // queries per hop) with a single self-join query.
     //
     // Algorithm:
-    //   buy_side CTE  — stations within hopDistance of current ref position
+    //   buy_side CTE  - stations within hopDistance of current ref position
     //                   that have stock of a commodity for sale. One row per
     //                   (station, commodity) with buyPrice > 0.
-    //   sell_side CTE — stations within hopDistance*2 of ref position
+    //   sell_side CTE - stations within hopDistance*2 of ref position
     //                   (geometrically: if buy ≤ D from ref, sell ≤ D from buy
     //                   means sell ≤ 2D from ref) that have demand > 0.
     //                   The sell box is centered on ref, not on each buy station,
     //                   which is what makes a single static query possible.
-    //   JOIN          — match buy and sell on commodityId, exclude same market,
+    //   JOIN          - match buy and sell on commodityId, exclude same market,
     //                   require sellPrice > buyPrice (profitable).
-    //   ORDER BY      — profitPerUnit * LEAST(stock, demand, cargoCap) DESC
+    //   ORDER BY      - profitPerUnit * LEAST(stock, demand, cargoCap) DESC
     //                   ranks by total run value, not just margin per unit.
-    //   LIMIT         — returns top :limit pairs; Java picks the best unused one
+    //   LIMIT         - returns top :limit pairs; Java picks the best unused one
     //                   and advances position to the sell station for the next hop.
     //
     // Pad and planetary filters apply to both sides independently.
@@ -229,7 +238,12 @@ public interface CommodityDao {
                 s.sellDistToArrival,
                 (s.sellPrice - b.buyPrice)                                                                 AS profitPerUnit,
                 ROUND(SQRT(POW(s.sellX - b.buyX, 2) + POW(s.sellY - b.buyY, 2) + POW(s.sellZ - b.buyZ, 2)), 2) AS distanceBuyToSell,
-                (s.sellPrice - b.buyPrice) * LEAST(b.buyStock, s.sellDemand, :cargoCap)                   AS runValue
+                (s.sellPrice - b.buyPrice) *
+                    CASE
+                        WHEN b.buyStock <= s.sellDemand AND b.buyStock <= :cargoCap THEN b.buyStock
+                        WHEN s.sellDemand <= :cargoCap                              THEN s.sellDemand
+                        ELSE :cargoCap
+                    END                                                                                     AS runValue
             FROM buy_side  b
             INNER JOIN sell_side s ON s.commodityId  = b.commodityId
                                   AND s.sellMarketId != b.buyMarketId

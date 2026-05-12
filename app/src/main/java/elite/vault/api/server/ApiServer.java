@@ -1,6 +1,5 @@
 package elite.vault.api.server;
 
-import elite.vault.api.services.CarrierRouteService;
 import elite.vault.api.services.CommoditiesService;
 import elite.vault.api.services.PirateHuntingService;
 import elite.vault.api.services.TradeRouteService;
@@ -32,10 +31,6 @@ public class ApiServer {
             }));
 
             /// Routes
-            // Carrier route
-            config.routes.post("/api/v1/search/carrier/route", CarrierRouteService::queueCarrierRoute);
-            config.routes.get("/api/v1/search/carrier/route/{job}", CarrierRouteService::getCarrierRoute);
-
             // Trade route
             config.routes.post("/api/v1/search/traderoute", TradeRouteService::queueTradeRoute);
             config.routes.get("/api/v1/search/traderoute/{job}", TradeRouteService::getTradeRoute);

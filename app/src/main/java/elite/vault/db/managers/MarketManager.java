@@ -36,7 +36,7 @@ public final class MarketManager {
     private final ConcurrentHashMap<String, Short> commodityTypeCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Object> marketLocks = new ConcurrentHashMap<>();
 
-    // systemAddress → starName. Unbounded but stable — system names never change.
+    // systemAddress → starName. Unbounded but stable - system names never change.
     private final ConcurrentHashMap<Long, String> systemNameCache = new ConcurrentHashMap<>();
 
     private MarketManager() {
@@ -109,7 +109,7 @@ public final class MarketManager {
 
     private void saveWithRetry(long mid, List<CommodityDao.CommodityRow> batch) {
         // -----------------------------------------------------------------------
-        // Deduplication gate — compute hash of incoming snapshot and compare to
+        // Deduplication gate - compute hash of incoming snapshot and compare to
         // the last accepted hash for this market. If unchanged, skip the replace
         // entirely. This prevents the common EDDN pattern of 4 commanders docking
         // at the same station within a second, all sending identical snapshots,
@@ -150,7 +150,7 @@ public final class MarketManager {
                 String state = extractSqlState(e);
                 if ("40001".equals(state) && attempts < 3) {
                     attempts++;
-                    log.debug("Deadlock on market {} — retry {}/3", mid, attempts);
+                    log.debug("Deadlock on market {} - retry {}/3", mid, attempts);
                     try {
                         Thread.sleep(50L * attempts);
                     } catch (InterruptedException ie) {

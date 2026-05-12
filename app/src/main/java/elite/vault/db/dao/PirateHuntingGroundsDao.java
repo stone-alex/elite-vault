@@ -17,40 +17,53 @@ import java.util.List;
 public interface PirateHuntingGroundsDao {
 
     @SqlQuery("""
+            WITH res_systems AS (
+                -- Per-system RES signal summary (deduplicated grades, max staleness/count)
+                SELECT ss.systemAddress,
+                       GROUP_CONCAT(DISTINCT rsg.grade) AS resGrades,
+                       MAX(ss.confirmedCount)           AS maxConfirmed,
+                       MAX(ss.lastSeen)                 AS lastSeen
+                FROM system_signals ss
+                JOIN res_signal_grades rsg ON rsg.signalName = ss.signalName
+                WHERE ss.signalType = 'ResourceExtraction'
+                  AND ss.lastSeen   > datetime('now', '-14 days')
+                GROUP BY ss.systemAddress
+            ),
+            pirate_factions AS (
+                -- Deduplicate faction names per system, then concatenate with pipe
+                SELECT systemAddress,
+                       GROUP_CONCAT(factionName, '|') AS pirateFactions
+                FROM (SELECT DISTINCT systemAddress, factionName
+                      FROM factions
+                      WHERE isPirate = 1)
+                GROUP BY systemAddress
+            )
             SELECT
                 sys.systemAddress,
                 sys.starName,
                 sys.x,
                 sys.y,
                 sys.z,
-                SQRT(POW(sys.x - :x, 2) + POW(sys.y - :y, 2) + POW(sys.z - :z, 2)) AS distanceLy,
-                GROUP_CONCAT(DISTINCT rsg.grade ORDER BY rsg.grade)                   AS resGrades,
-                GROUP_CONCAT(DISTINCT f.factionName ORDER BY f.factionName SEPARATOR '|') AS pirateFactions,
-                MAX(ss.confirmedCount)                                                 AS maxConfirmed,
-                MAX(ss.lastSeen)                                                       AS lastSeen
+                sqrt((sys.x - :x)*(sys.x - :x) + (sys.y - :y)*(sys.y - :y) + (sys.z - :z)*(sys.z - :z)) AS distanceLy,
+                rs.resGrades,
+                pf.pirateFactions,
+                rs.maxConfirmed,
+                rs.lastSeen
             FROM star_system sys
-            JOIN system_signals ss
-                ON  ss.systemAddress = sys.systemAddress
-                AND ss.signalType    = 'ResourceExtraction'
-                AND ss.lastSeen      > NOW() - INTERVAL 14 DAY
-            JOIN res_signal_grades rsg
-                ON  rsg.signalName   = ss.signalName
-            JOIN factions f
-                ON  f.systemAddress  = sys.systemAddress
-                AND f.isPirate       = 1
+            JOIN res_systems     rs ON rs.systemAddress = sys.systemAddress
+            JOIN pirate_factions pf ON pf.systemAddress = sys.systemAddress
             WHERE
                 sys.x BETWEEN :x - :rangeLy AND :x + :rangeLy
                 AND sys.y BETWEEN :y - :rangeLy AND :y + :rangeLy
                 AND sys.z BETWEEN :z - :rangeLy AND :z + :rangeLy
-            GROUP BY sys.systemAddress, sys.starName, sys.x, sys.y, sys.z
             ORDER BY
                 CASE
-                    WHEN GROUP_CONCAT(DISTINCT rsg.grade) LIKE '%Hazardous%' THEN 0
-                    WHEN GROUP_CONCAT(DISTINCT rsg.grade) LIKE '%High%'      THEN 1
-                    WHEN GROUP_CONCAT(DISTINCT rsg.grade) LIKE '%Normal%'    THEN 2
+                    WHEN rs.resGrades LIKE '%Hazardous%' THEN 0
+                    WHEN rs.resGrades LIKE '%High%'      THEN 1
+                    WHEN rs.resGrades LIKE '%Normal%'    THEN 2
                     ELSE 3
                 END,
-                MAX(ss.confirmedCount) DESC
+                rs.maxConfirmed DESC
             LIMIT 20
             """)
     List<HuntingGround> findHuntingGrounds(

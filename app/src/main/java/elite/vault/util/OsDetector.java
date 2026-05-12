@@ -6,7 +6,9 @@ public class OsDetector {
     public static String os = System.getProperty("os.name").toLowerCase();
 
     public static OS getOs() {
-        return OS.LINUX.getOs().equals(os) ? OS.LINUX : OS.WINDOWS;
+        if (os.contains("linux")) return OS.LINUX;
+        if (os.contains("mac") || os.contains("darwin")) return OS.MAC;
+        return OS.WINDOWS;
     }
 
     public enum OS {

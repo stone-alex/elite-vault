@@ -8,7 +8,6 @@ public enum Singletons {
     SINGLETONS;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final StellarObjectManager stellarObjectManager = StellarObjectManager.getInstance();
     private final MarketManager marketManager = MarketManager.getInstance();
     private final StarSystemManager starSystemManager = StarSystemManager.getInstance();
     private final FssSignalManager fssSignalManager = FssSignalManager.getInstance();
@@ -17,10 +16,6 @@ public enum Singletons {
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;
-    }
-
-    public StellarObjectManager getStellarObjectManager() {
-        return stellarObjectManager;
     }
 
     public MarketManager getMarketManager() {

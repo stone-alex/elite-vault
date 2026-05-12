@@ -4,6 +4,7 @@ import com.google.common.eventbus.Subscribe;
 import elite.vault.eddn.dto.EDDN_JournalDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 import elite.vault.json.GsonFactory;
+import elite.vault.util.BubbleFilter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -20,6 +21,10 @@ public class FsdJumpSubscriber {
         if (!"FSDJump".equalsIgnoreCase(data.getEvent())) return;
         if (data.getStarSystem() == null || data.getSystemAddress() == null) {
             log.debug("FSDJump dropped - missing required fields");
+            return;
+        }
+        if (!BubbleFilter.isInBubble(data.getStarPos())) {
+            log.trace("FSDJump outside bubble, ignored: {}", data.getStarSystem());
             return;
         }
         EventProcessingExecutor.submit(() -> update(data));

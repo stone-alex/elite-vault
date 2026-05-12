@@ -19,17 +19,19 @@ public interface FactionsDao {
                 (systemAddress, factionName, allegiance, government, influence, factionState, happiness, isPirate)
             VALUES
                 (:systemAddress, :factionName, :allegiance, :government, :influence, :factionState, :happiness,
-                    (SELECT COUNT(*) > 0 FROM pirate_faction_keywords WHERE :factionName LIKE CONCAT('%', keyword, '%'))
-                    OR :government = 'Anarchy'
+                    CASE WHEN
+                        (SELECT COUNT(*) FROM pirate_faction_keywords WHERE :factionName LIKE '%' || keyword || '%') > 0
+                        OR :government = 'Anarchy'
+                    THEN 1 ELSE 0 END
                 )
-            ON DUPLICATE KEY UPDATE
-                allegiance   = VALUES(allegiance),
-                government   = VALUES(government),
-                influence    = VALUES(influence),
-                factionState = VALUES(factionState),
-                happiness    = VALUES(happiness),
-                received_at  = NOW()
-                -- isPirate is intentionally not updated — set once on insert, stable
+            ON CONFLICT(systemAddress, factionName) DO UPDATE SET
+                allegiance   = excluded.allegiance,
+                government   = excluded.government,
+                influence    = excluded.influence,
+                factionState = excluded.factionState,
+                happiness    = excluded.happiness,
+                received_at  = datetime('now')
+                -- isPirate intentionally not updated - set once on insert, stable
             """)
     void upsert(@BindBean Faction data);
 

@@ -37,22 +37,22 @@ public interface StationsDao {
                 :stationType,
                 :x, :y, :z
             )
-            ON DUPLICATE KEY UPDATE
-                realName                = VALUES(realName),
-                controllingFaction      = VALUES(controllingFaction),
-                controllingFactionState = VALUES(controllingFactionState),
-                distanceToArrival       = VALUES(distanceToArrival),
-                primaryEconomy          = VALUES(primaryEconomy),
-                economies               = VALUES(economies),
-                government              = VALUES(government),
-                services                = VALUES(services),
-                stationType             = VALUES(stationType),
-                hasLargePad             = VALUES(hasLargePad),
-                hasMediumPad            = VALUES(hasMediumPad),
-                hasSmallPad             = VALUES(hasSmallPad),
-                x                       = VALUES(x),
-                y                       = VALUES(y),
-                z                       = VALUES(z)
+            ON CONFLICT(marketId) DO UPDATE SET
+                realName                = excluded.realName,
+                controllingFaction      = excluded.controllingFaction,
+                controllingFactionState = excluded.controllingFactionState,
+                distanceToArrival       = excluded.distanceToArrival,
+                primaryEconomy          = excluded.primaryEconomy,
+                economies               = excluded.economies,
+                government              = excluded.government,
+                services                = excluded.services,
+                stationType             = excluded.stationType,
+                hasLargePad             = excluded.hasLargePad,
+                hasMediumPad            = excluded.hasMediumPad,
+                hasSmallPad             = excluded.hasSmallPad,
+                x                       = excluded.x,
+                y                       = excluded.y,
+                z                       = excluded.z
             """)
     void upsert(@BindBean Station data);
 

@@ -24,7 +24,7 @@ public interface MissionProviderDao {
                 f.factionState,
                 f.influence,
                 sys.starName                                                                        AS systemName,
-                SQRT(POW(st.x - :huntX, 2) + POW(st.y - :huntY, 2) + POW(st.z - :huntZ, 2))      AS distanceLy
+                sqrt((st.x - :huntX)*(st.x - :huntX) + (st.y - :huntY)*(st.y - :huntY) + (st.z - :huntZ)*(st.z - :huntZ)) AS distanceLy
             FROM stations st
             JOIN star_system sys
                 ON  sys.systemAddress = st.systemAddress
@@ -38,7 +38,7 @@ public interface MissionProviderDao {
                 AND st.z BETWEEN :huntZ - 20 AND :huntZ + 20
                 AND st.systemAddress  != :huntSystemAddress
                 AND st.stationType    != 'FleetCarrier'
-                AND JSON_CONTAINS(st.services, '"dock"')
+                AND EXISTS (SELECT 1 FROM json_each(st.services) WHERE value = 'dock')
             ORDER BY
                 CASE f.factionState
                     WHEN 'War'      THEN 0

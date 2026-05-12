@@ -4,6 +4,7 @@ import com.google.common.eventbus.Subscribe;
 import elite.vault.eddn.dto.EDDN_FssSignalMessageDto;
 import elite.vault.eddn.events.EddnMessageEvent;
 import elite.vault.json.GsonFactory;
+import elite.vault.util.BubbleFilter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -19,6 +20,11 @@ public class FssSignalSubscriber {
         EDDN_FssSignalMessageDto data = GsonFactory.getGson().fromJson(event.getRawJson(), EDDN_FssSignalMessageDto.class);
 
         if (!isValid(data)) return;
+
+        if (!BubbleFilter.isInBubble(data.getStarPos())) {
+            log.trace("FSS signal outside bubble, ignored: {}", data.getStarSystem());
+            return;
+        }
 
         if (data.getSystemAddress() == null || data.getStarSystem() == null) {
             log.debug("FSSSignalDiscovered dropped - missing systemAddress or starSystem");

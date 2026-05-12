@@ -25,7 +25,7 @@ public class TradeRouteService {
             description = """
                     Queues an async trade route job. Returns a job ID immediately.
                     Poll GET /api/v1/search/traderoute/{job} for results.
-                    Supply x+y+z directly — saves a DB round-trip and works even when
+                    Supply x+y+z directly - saves a DB round-trip and works even when
                     the player is in a system with no market.
                     """,
             operationId = "queueTradeRoute",
@@ -88,7 +88,7 @@ public class TradeRouteService {
     // -------------------------------------------------------------------------
     @OpenApi(
             summary = "Poll for trade route result",
-            description = "Returns 202 while calculating. Returns 200 with route when complete — job flushed on delivery. " +
+            description = "Returns 202 while calculating. Returns 200 with route when complete - job flushed on delivery. " +
                     "Returns 404 if job unknown or expired.",
             operationId = "getTradeRoute",
             tags = {"Commodities", "Market"},

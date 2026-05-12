@@ -40,7 +40,7 @@ public class JobStore<T> {
             return t;
         });
 
-        // TTL reaper — daemon thread, runs every minute
+        // TTL reaper - daemon thread, runs every minute
         ScheduledExecutorService reaper = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, name + "-reaper");
             t.setDaemon(true);
@@ -81,14 +81,14 @@ public class JobStore<T> {
     /**
      * Poll for a job result.
      * Returns null if job not found (404 case).
-     * Returns the Job object — caller checks job.isDone().
+     * Returns the Job object - caller checks job.isDone().
      */
     public Job<T> poll(String jobId) {
         return jobs.get(jobId);
     }
 
     /**
-     * Remove a job — called after successful delivery to client.
+     * Remove a job - called after successful delivery to client.
      */
     public void flush(String jobId) {
         jobs.remove(jobId);

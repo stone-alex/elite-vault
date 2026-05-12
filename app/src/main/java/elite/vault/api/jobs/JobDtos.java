@@ -8,7 +8,7 @@ package elite.vault.api.jobs;
 public class JobDtos {
 
     /**
-     * Returned with HTTP 202 on POST — client uses job ID to poll.
+     * Returned with HTTP 202 on POST - client uses job ID to poll.
      */
     public record JobAcceptedResponse(String job) {
     }

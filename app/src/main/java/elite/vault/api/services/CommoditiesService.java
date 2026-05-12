@@ -63,7 +63,7 @@ public class CommoditiesService {
     // -------------------------------------------------------------------------
     @OpenApi(
             summary = "Poll for commodity search result",
-            description = "Returns 202 while calculating. Returns 200 with results when complete — job flushed on delivery. " +
+            description = "Returns 202 while calculating. Returns 200 with results when complete - job flushed on delivery. " +
                     "Returns 404 if job unknown or expired.",
             operationId = "getCommoditySearch",
             tags = {"Commodities", "Market"},
