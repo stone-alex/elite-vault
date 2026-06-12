@@ -2,6 +2,8 @@
 
 ## Self-hosted, real-time data platform for Elite Dangerous
 
+There is no development happening on this project right now.
+
 Elite Vault is a lightweight, pure-Java service that connects to the
 [Elite Dangerous Data Network (EDDN)](https://github.com/EDCD/EDDN)
 to ingest live game data (markets, powerplay, systems, discoveries, etc.)
